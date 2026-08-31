@@ -12,6 +12,14 @@
   <link rel="stylesheet" href="./style.css?v=35">
   <style>
     .video-list{display:grid;gap:12px}
+    .season-block{margin-bottom:10px}
+    .season-header{
+      width:100%;display:flex;justify-content:space-between;align-items:center;
+      background:var(--card);border:1px solid var(--ring);border-radius:12px;
+      padding:12px 14px;font-weight:800;font-size:14px;color:var(--text);cursor:pointer
+    }
+    .season-header .chevron{font-size:12px;color:var(--muted)}
+    .season-content{gap:12px;margin-top:10px}
     .video-card{overflow:hidden}
     .video-card .title{font-weight:700;margin:8px 0 4px 0;overflow-wrap:break-word;word-break:break-word}
     .video-card a.small{overflow-wrap:break-word;word-break:break-word}
@@ -93,9 +101,10 @@
   <script defer src="./install-prompt.js?v=2"></script>
 
   <script type="module">
-    import { subscribeVideos } from './data-store.js';
+    import { subscribeVideos, currentSeason } from './data-store.js';
 
     const box = document.getElementById('videos');
+    const openSeasons = {}; // ricordo quali sezioni sono aperte tra un aggiornamento e l'altro
 
     const isYouTube = (u)=> /youtube\.com\/watch\?v=|youtu\.be\//i.test(u||'');
     const isInstagram = (u)=> /instagram\.com\/(p|reel|tv)\//i.test(u||'');
@@ -105,19 +114,6 @@
       const m2 = u.match(/youtu\.be\/([^?&]+)/); if (m2) return m2[1];
       return '';
     };
-
-    // Lo script ufficiale Instagram trasforma i <blockquote> in veri post/reel
-    // incorporati. Va caricato una volta sola, e richiamato di nuovo ogni volta
-    // che aggiungiamo nuovi blockquote alla pagina (non li processa da solo).
-    let igScriptLoaded = false;
-    function ensureInstagramScript(){
-      if (igScriptLoaded) { window.instgrm?.Embeds?.process(); return; }
-      igScriptLoaded = true;
-      const s = document.createElement('script');
-      s.src = 'https://www.instagram.com/embed.js';
-      s.async = true;
-      document.body.appendChild(s);
-    }
 
     function card(v){
       const titolo = v.nome || 'Video';
@@ -154,12 +150,46 @@
       }
     }
 
+    function renderVideos(list){
+      const rows = list || [];
+      const bySeason = {};
+      rows.forEach(v => {
+        const s = v.stagione || currentSeason();
+        (bySeason[s] = bySeason[s] || []).push(v);
+      });
+
+      const seasons = Object.keys(bySeason).sort((a,b) => b.localeCompare(a)); // più recente prima
+      if (!seasons.length){
+        box.innerHTML = `<div class="small">Nessun video disponibile.</div>`;
+        return;
+      }
+
+      box.innerHTML = seasons.map(s => {
+        const videos = bySeason[s].slice().sort((a,b) => (+a.ordine||0) - (+b.ordine||0));
+        const isOpen = !!openSeasons[s];
+        return `
+          <div class="season-block">
+            <button type="button" class="season-header" data-season="${s}">
+              <span>🎥 Stagione ${s} <span class="small" style="font-weight:400">(${videos.length})</span></span>
+              <span class="chevron">${isOpen ? '▲' : '▼'}</span>
+            </button>
+            <div class="season-content" style="display:${isOpen ? 'grid' : 'none'}">
+              ${videos.map(card).join('')}
+            </div>
+          </div>`;
+      }).join('');
+
+      box.querySelectorAll('.season-header').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const s = btn.dataset.season;
+          openSeasons[s] = !openSeasons[s];
+          renderVideos(rows);
+        });
+      });
+    }
+
     // 👇 si aggiorna da solo appena l'admin aggiunge/modifica un video
-    subscribeVideos((list) => {
-      box.innerHTML = (list||[]).length
-        ? list.map(card).join('')
-        : `<div class="small">Nessun video disponibile.</div>`;
-    });
+    subscribeVideos(renderVideos);
 
     localStorage.setItem('corb-seen-video', String(Date.now()));
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');

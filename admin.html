@@ -305,12 +305,13 @@
       videos: {
         label: 'Video', api: Videos, subscribe: subscribeVideos,
         fields: [
+          {key:'stagione', label:'Stagione', type:'text', placeholder:'2025/26'},
           {key:'nome', label:'Titolo video', type:'text'},
           {key:'link', label:"Link Instagram (es. https://www.instagram.com/reel/XXXXX/)", type:'text'},
           {key:'logo', label:'Copertina (URL, non serve per Instagram/YouTube)', type:'text'},
         ],
-        itemLabel: (v)=> v.nome || '(senza titolo)',
-        sort: null
+        itemLabel: (v)=> `${v.nome || '(senza titolo)'} ${v.stagione ? '· '+v.stagione : ''}`,
+        sort: (a,b) => (+a.ordine||0) - (+b.ordine||0)
       },
       standings: {
         label: 'Classifica', api: Standings, subscribe: subscribeStandings,
@@ -359,7 +360,7 @@
               // Se sto AGGIUNGENDO (non modificando), precompilo dei valori sensati
               // di default: "Corbiolo" come squadra in casa, e la stagione corrente.
               let defaultValue = '';
-              if (!prefill && (currentTab==='matches' || currentTab==='standings')){
+              if (!prefill && (currentTab==='matches' || currentTab==='standings' || currentTab==='videos')){
                 if (f.key==='casa') defaultValue = 'Corbiolo';
                 if (f.key==='stagione') defaultValue = currentSeason();
                 if (f.key==='live') defaultValue = 'No';
@@ -404,20 +405,46 @@
       setTimeout(()=>{ $('msgZone').innerHTML=''; }, 4000);
     }
 
+    async function moveVideo(rows, id, direction){
+      const idx = rows.findIndex(r => r.id === id);
+      const targetIdx = idx + direction;
+      if (targetIdx < 0 || targetIdx >= rows.length) return;
+      const a = rows[idx], b = rows[targetIdx];
+      // Se l'ordine non è ancora mai stato impostato, lo assegno ora in base
+      // alla posizione attuale, così i prossimi spostamenti funzionano sempre.
+      const ordA = a.ordine != null ? +a.ordine : idx;
+      const ordB = b.ordine != null ? +b.ordine : targetIdx;
+      try{
+        await Videos.update(a.id, { ordine: ordB });
+        await Videos.update(b.id, { ordine: ordA });
+      }catch(err){ showMsg('Errore: '+err.message, 'err'); }
+    }
+
     function renderList(){
       const ent = ENTITIES[currentTab];
       $('listTitle').textContent = 'Elenco ' + ent.label.toLowerCase();
       const rows = [...(cache[currentTab]||[])];
       if (ent.sort) rows.sort(ent.sort);
-      $('listZone').innerHTML = rows.length ? rows.map(r => `
+      $('listZone').innerHTML = rows.length ? rows.map((r,i) => `
         <div class="item-row">
           <div>${ent.itemLabel(r)}</div>
           <div class="item-actions">
+            ${currentTab==='videos' ? `
+              <button data-act="up" data-id="${r.id}" ${i===0?'disabled':''}>⬆️</button>
+              <button data-act="down" data-id="${r.id}" ${i===rows.length-1?'disabled':''}>⬇️</button>
+            ` : ''}
             <button data-act="edit" data-id="${r.id}">✏️ Modifica</button>
             <button data-act="del" data-id="${r.id}">🗑️ Elimina</button>
             ${currentTab==='matches' ? `<button data-act="cronaca" data-id="${r.id}">📓 Cronaca</button>` : ''}
           </div>
         </div>`).join('') : '<div class="small">Nessun elemento ancora.</div>';
+
+      $('listZone').querySelectorAll('[data-act="up"]').forEach(btn=>{
+        btn.onclick = ()=> moveVideo(rows, btn.dataset.id, -1);
+      });
+      $('listZone').querySelectorAll('[data-act="down"]').forEach(btn=>{
+        btn.onclick = ()=> moveVideo(rows, btn.dataset.id, 1);
+      });
 
       $('listZone').querySelectorAll('[data-act="edit"]').forEach(btn=>{
         btn.onclick = ()=>{
