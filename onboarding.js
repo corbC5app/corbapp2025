@@ -8,29 +8,39 @@
 
   const SLIDES = [
     {
+      img: 'img/onboarding/nuova-app.jpg',
       emoji: '⚽',
       title: "Benvenuto nell'app del Corbiolo!",
       text: 'Un giro veloce di 20 secondi per farti vedere cosa puoi fare qui dentro.'
     },
     {
-      emoji: '📅',
-      title: 'Prossima partita',
-      text: 'Countdown, dove si gioca e un tasto per aggiungerla al tuo calendario del telefono in un tocco.'
-    },
-    {
+      img: 'img/onboarding/diretta.jpg',
       emoji: '🔴',
       title: 'Diretta e notifiche',
-      text: 'Quando giochiamo, segui il punteggio in tempo reale in Home. Attiva le notifiche in Impostazioni per non perderti gol e inizio partita.'
+      text: 'Cronaca live, gol e cartellini in tempo reale. Attiva le notifiche in Impostazioni per non perderti nulla.'
     },
     {
+      img: 'img/onboarding/classifica.jpg',
       emoji: '🏆',
-      title: 'Risultati, Calendario, Classifica',
-      text: 'Tutto il girone, giornata per giornata, con classifica e marcatori sempre aggiornati.'
+      title: 'Classifica e Marcatori',
+      text: 'La classifica del girone e i marcatori della squadra, sempre aggiornati da soli.'
     },
     {
-      emoji: '👉',
-      title: 'Tutto qui',
-      text: 'Trovi tutto nel menu (☰ in alto). Buona partita!'
+      img: 'img/onboarding/statistiche.jpg',
+      emoji: '📊',
+      title: 'Statistiche della stagione',
+      text: 'Vittorie, pareggi, gol fatti e subiti: tutti i numeri della stagione in un colpo d\'occhio.'
+    },
+    {
+      img: 'img/onboarding/competizioni.jpg',
+      emoji: '🏅',
+      title: 'Competizioni',
+      text: 'Campionato, Coppa e Amichevoli, girone completo con tutte le giornate.'
+    },
+    {
+      emoji: '✅',
+      title: 'SIAMO PRONTI!',
+      text: 'Trovi tutte le info nel menù ☰ in alto. Buona stagione!'
     }
   ];
 
@@ -51,10 +61,11 @@
       <div style="text-align:right">
         <button id="corb-onb-skip" style="border:0;background:transparent;color:#9c8a90;font-size:13px;cursor:pointer;font-weight:600">Salta ✕</button>
       </div>
-      <div style="text-align:center;padding:10px 10px 0">
-        <div style="font-size:52px;line-height:1">${s.emoji}</div>
-        <div style="font-weight:800;font-size:19px;margin-top:14px;color:#2b1d22">${s.title}</div>
-        <div style="font-size:14px;color:#7a5d66;margin-top:10px;line-height:1.5">${s.text}</div>
+      ${s.img ? `<img src="${s.img}" alt="" style="width:100%;border-radius:14px;display:block;box-shadow:0 6px 18px rgba(0,0,0,.15)">` : ''}
+      <div style="text-align:center;padding:${s.img ? '14px' : '10px'} 10px 0">
+        ${!s.img ? `<div style="font-size:52px;line-height:1">${s.emoji}</div>` : `<div style="font-size:22px;line-height:1">${s.emoji}</div>`}
+        <div style="font-weight:800;font-size:19px;margin-top:10px;color:#2b1d22">${s.title}</div>
+        <div style="font-size:14px;color:#7a5d66;margin-top:8px;line-height:1.5">${s.text}</div>
       </div>
       <div style="display:flex;justify-content:center;gap:6px;margin:22px 0 16px">${dots}</div>
       <div style="display:flex;gap:10px;padding:0 4px">
