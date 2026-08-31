@@ -10,7 +10,7 @@
     {
       img: 'img/onboarding/nuova-app.jpg',
       emoji: '⚽',
-      title: "Benvenuto nell'app del Corbiolo!",
+      title: "Benvenuto nell'app del Corbiolo C5!",
       text: 'Un giro veloce di 20 secondi per farti vedere cosa puoi fare qui dentro.'
     },
     {
