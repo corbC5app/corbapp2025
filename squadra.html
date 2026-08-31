@@ -138,6 +138,7 @@
                 ${p.numero ? `<span class="num-badge">${p.numero}</span>` : ``}
               </div>
               <div class="pname">${p.nome}</div>
+              ${p.soprannome ? `<div class="small" style="color:var(--muted);margin-top:1px">"${p.soprannome}"</div>` : ''}
             </div>
           `).join('');
           return `<div class="role-title">${title}</div><div class="players-grid">${items}</div>`;
@@ -159,6 +160,7 @@
     subscribePlayers((rows) => {
       RAW = (rows||[]).map(p=>({
         nome: (p.nome||'').trim(),
+        soprannome: (p.soprannome||'').trim(),
         numero: (p.numero||'').toString().trim(),
         ruolo: (p.ruolo||'').toString().trim().toLowerCase(),
         foto: p.foto || ''

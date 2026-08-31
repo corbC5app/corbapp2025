@@ -294,12 +294,13 @@
         label: 'Giocatori', api: Players, subscribe: subscribePlayers,
         fields: [
           {key:'nome', label:'Nome', type:'text'},
+          {key:'soprannome', label:'Soprannome (usato in Diretta per non confonderlo con nomi simili)', type:'text'},
           {key:'numero', label:'Numero maglia', type:'text'},
           {key:'ruolo', label:'Ruolo', type:'select', options:['allenatore','portiere','centrale','laterale','pivot']},
           {key:'foto', label:'Foto (URL o nome file in img/)', type:'text'},
           {key:'gol', label:'Gol segnati (stagione in corso)', type:'text', placeholder:'0'},
         ],
-        itemLabel: (p)=> `#${p.numero||'-'} ${p.nome||'(senza nome)'} ${p.gol ? '⚽ '+p.gol : ''}`,
+        itemLabel: (p)=> `#${p.numero||'-'} ${p.nome||'(senza nome)'} ${p.soprannome ? '"'+p.soprannome+'"' : ''} ${p.gol ? '⚽ '+p.gol : ''}`,
         sort: null
       },
       videos: {
@@ -513,6 +514,12 @@
     };
     let clockTickTimer = null;
 
+    // Prova Diretta: una console identica ma TUTTA LOCALE (solo nel browser,
+    // mai scritta su Firestore). Serve per esercitarsi o controllare che i
+    // soprannomi/numeri siano collegati bene, senza mandare notifiche vere
+    // né toccare classifica, marcatori o cronaca di nessuna partita reale.
+    const provaState = { open:false, team:'casa', eventType:'gol', eventi:[] };
+
     function periodLabel(p){ return p==='1T' ? '1°T' : p==='2T' ? '2°T' : 'Rec.'; }
     function eventEmoji(t){ return t==='gol' ? '⚽' : t==='giallo' ? '🟨' : '🟥'; }
 
@@ -649,12 +656,76 @@
       }catch(err){ showMsg('Errore: '+err.message, 'err'); }
     }
 
+    function renderProvaSection(){
+      const players = (cache.players || []);
+      const numBtns = Array.from({length:20}, (_,i)=> i+1).map(n=>{
+        const p = provaState.team==='casa' ? players.find(pl => (pl.numero||'').toString()===String(n)) : null;
+        const displayName = p ? (p.soprannome || (p.nome||'').split(' ')[0]) : '';
+        const label = p ? `${n}<br><span style="font-size:8px;font-weight:400">${displayName}</span>` : n;
+        return `<button class="num-btn prova-num-btn" data-num="${n}" data-display="${p ? displayName : ''}" style="font-size:10px">${label}</button>`;
+      }).join('');
+
+      return `
+        <div class="card" style="padding:12px;border:2px dashed var(--ring)">
+          <button id="provaToggleBtn" class="live-toggle ${provaState.open ? 'on' : ''}" style="font-size:13px;padding:10px">
+            ${provaState.open ? '🧪 PROVA DIRETTA ATTIVA — tocca per fermare' : '🧪 Prova Diretta (solo per te, nessuna notifica)'}
+          </button>
+          ${provaState.open ? `
+            <div style="margin-top:10px">
+              <div class="live-row">
+                <div class="seg-compact" id="provaTeamSeg">
+                  <button class="seg-btn-sm ${provaState.team==='casa'?'active':''}" data-pteam="casa">Corbiolo (rosa vera)</button>
+                  <button class="seg-btn-sm ${provaState.team==='fuori'?'active':''}" data-pteam="fuori">Avversario di prova</button>
+                </div>
+              </div>
+              <div class="live-row" style="margin-top:6px">
+                <div class="seg-compact" id="provaTypeSeg">
+                  <button class="seg-btn-sm ${provaState.eventType==='gol'?'active':''}" data-ptype="gol">⚽ Gol</button>
+                  <button class="seg-btn-sm ${provaState.eventType==='giallo'?'active':''}" data-ptype="giallo">🟨 Giallo</button>
+                  <button class="seg-btn-sm ${provaState.eventType==='rosso'?'active':''}" data-ptype="rosso">🟥 Rosso</button>
+                </div>
+              </div>
+              <div class="num-grid" style="margin-top:8px">${numBtns}</div>
+              <div class="row" style="justify-content:space-between;align-items:center;margin-top:10px">
+                <div class="small" style="font-weight:700">Finta cronaca (solo qui, non salvata)</div>
+                <button id="provaClearBtn" class="btn btn-ghost" style="font-size:11px;padding:5px 8px">🗑️ Svuota</button>
+              </div>
+              <div class="cronaca-box" style="margin-top:6px">
+                ${provaState.eventi.length ? provaState.eventi.map(e=>`<div class="console-row"><span>${e}</span></div>`).reverse().join('') : '<div class="small" style="padding:4px 0">Nessun evento ancora — tocca un numero qui sopra per provare.</div>'}
+              </div>
+            </div>
+          ` : ''}
+        </div>`;
+    }
+
+    function wireProvaSection(zone){
+      $('provaToggleBtn').onclick = ()=>{ provaState.open = !provaState.open; renderLiveTab(); };
+      if (!provaState.open) return;
+
+      zone.querySelectorAll('[data-pteam]').forEach(b=> b.onclick = ()=>{ provaState.team = b.dataset.pteam; renderLiveTab(); });
+      zone.querySelectorAll('[data-ptype]').forEach(b=> b.onclick = ()=>{ provaState.eventType = b.dataset.ptype; renderLiveTab(); });
+      const clearBtn = $('provaClearBtn');
+      if (clearBtn) clearBtn.onclick = ()=>{ provaState.eventi = []; renderLiveTab(); };
+
+      zone.querySelectorAll('.prova-num-btn').forEach(b=>{
+        b.onclick = ()=>{
+          const n = b.dataset.num;
+          const displayName = b.dataset.display;
+          const teamName = provaState.team==='casa' ? 'Corbiolo' : 'Avversario di prova';
+          const who = displayName ? `${displayName} (#${n})` : `Numero ${n}`;
+          const emoji = provaState.eventType==='gol' ? '⚽' : provaState.eventType==='giallo' ? '🟨' : '🟥';
+          provaState.eventi.push(`${emoji} ${who} — ${teamName}`);
+          renderLiveTab();
+        };
+      });
+    }
+
     function renderLiveTab(){
       const zone = $('liveConsoleZone');
+      const players = (cache.players || []);
       const matches = (cache.matches || [])
         .filter(m => (m.casa||'').trim().toLowerCase()==='corbiolo' || (m.fuori||'').trim().toLowerCase()==='corbiolo')
         .slice().sort((a,b)=> (b.data||'').localeCompare(a.data||''));
-      const players = (cache.players || []);
 
       if (!liveState.matchId && matches.length){
         liveState.matchId = matches[0].id;
@@ -666,8 +737,11 @@
 
       if (clockTickTimer){ clearInterval(clockTickTimer); clockTickTimer = null; }
 
+      const provaHtml = renderProvaSection();
+
       if (!match){
-        zone.innerHTML = `<div class="card small">Nessuna partita disponibile. Creane una nella tab Partite.</div>`;
+        zone.innerHTML = provaHtml + `<div class="card small" style="margin-top:10px">Nessuna partita disponibile. Creane una nella tab Partite per la diretta vera.</div>`;
+        wireProvaSection(zone);
         return;
       }
 
@@ -682,11 +756,13 @@
 
       const numBtns = Array.from({length:20}, (_,i)=> i+1).map(n=>{
         const p = liveState.team===corbSide ? players.find(pl => (pl.numero||'').toString()===String(n)) : null;
-        const label = p ? `${n}<br><span style="font-size:9px;font-weight:400">${(p.nome||'').split(' ')[0]}</span>` : n;
-        return `<button class="num-btn" data-num="${n}" data-name="${p ? (p.nome||'') : ''}">${label}</button>`;
+        const displayName = p ? (p.soprannome || (p.nome||'').split(' ')[0]) : '';
+        const label = p ? `${n}<br><span style="font-size:9px;font-weight:400">${displayName}</span>` : n;
+        return `<button class="num-btn" data-num="${n}" data-name="${p ? (p.nome||'') : ''}" data-display="${p ? displayName : ''}">${label}</button>`;
       }).join('');
 
-      zone.innerHTML = `
+      zone.innerHTML = provaHtml + `
+        <div style="height:14px"></div>
         <div class="live-wrap">
           <select class="live-select" id="liveMatchSelect">${options}</select>
 
@@ -745,6 +821,7 @@
       $('liveMatchSelect').onchange = (e)=>{ liveState.matchId = e.target.value; liveState.team = corbSide; renderLiveTab(); };
       $('liveToggleBtn').onclick = ()=> toggleLive(match);
       $('openFullCronacaBtn').onclick = ()=> { ensureSubscribed('players'); openCronacaEditor(match); };
+      wireProvaSection(zone);
 
       zone.querySelectorAll('[data-period]').forEach(b=> b.onclick = ()=> setPeriod(match, b.dataset.period));
       zone.querySelectorAll('[data-team]').forEach(b=> b.onclick = ()=>{ liveState.team = b.dataset.team; renderLiveTab(); });
@@ -758,11 +835,12 @@
       zone.querySelectorAll('.num-btn').forEach(b=>{
         b.onclick = async ()=>{
           const n = b.dataset.num;
-          const name = b.dataset.name;
+          const name = b.dataset.name;         // nome vero, serve per i marcatori
+          const displayName = b.dataset.display; // soprannome (o nome), serve per la cronaca
           const casaNome = match.casa || 'Corbiolo';
           const fuoriNome = match.fuori || 'Avversario';
           const teamName = liveState.team==='casa' ? casaNome : fuoriNome;
-          const who = name ? `${name} (#${n})` : `Numero ${n}`;
+          const who = displayName ? `${displayName} (#${n})` : `Numero ${n}`;
           const label = `${eventEmoji(liveState.eventType)} ${who} — ${teamName}`;
 
           let extra = {};
@@ -827,8 +905,9 @@
         const players = cache.players || [];
         const numBtnsHtml = Array.from({length:20}, (_,i)=> i+1).map(n=>{
           const p = quickTeam===corbSide ? players.find(pl => (pl.numero||'').toString()===String(n)) : null;
-          const label = p ? `${n}<br><span style="font-size:8px;font-weight:400">${(p.nome||'').split(' ')[0]}</span>` : n;
-          return `<button class="num-btn" data-num="${n}" data-name="${p ? (p.nome||'') : ''}" style="font-size:10px">${label}</button>`;
+          const displayName = p ? (p.soprannome || (p.nome||'').split(' ')[0]) : '';
+          const label = p ? `${n}<br><span style="font-size:8px;font-weight:400">${displayName}</span>` : n;
+          return `<button class="num-btn" data-num="${n}" data-name="${p ? displayName : ''}" style="font-size:10px">${label}</button>`;
         }).join('');
 
         cronacaCard.innerHTML = `
