@@ -24,6 +24,9 @@
     .avatar-wrap{position:relative;width:64px;height:64px}
     .avatar-wrap img{width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid #e8d3d9;display:block}
     :root[data-theme="dark"] .avatar-wrap img{border-color:#fff}
+    /* Chi non ha una foto vera mostra solo lo stemma, senza il cerchio (rosa o bianco) attorno */
+    .avatar-wrap img.no-photo{border:0;border-radius:0;object-fit:contain;background:transparent}
+    :root[data-theme="dark"] .avatar-wrap img.no-photo{border:0}
     .num-badge{
       position:absolute;bottom:-4px;right:-4px;background:#6b0f1a;color:#fff;
       border-radius:999px;font-size:10px;font-weight:800;min-width:18px;height:18px;
@@ -131,7 +134,7 @@
           const items = groups[k].map(p=>`
             <div class="player-card">
               <div class="avatar-wrap">
-                <img src="${p.foto||'img/logo_c5.png'}" alt="" onerror="this.src='img/logo_c5.png'">
+                <img class="${p.foto ? '' : 'no-photo'}" src="${p.foto||'img/logo_c5.png'}" alt="" onerror="this.src='img/logo_c5.png';this.classList.add('no-photo')">
                 ${p.numero ? `<span class="num-badge">${p.numero}</span>` : ``}
               </div>
               <div class="pname">${p.nome}</div>
