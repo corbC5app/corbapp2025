@@ -53,6 +53,15 @@
       0%,100%{box-shadow:0 0 0 4px rgba(224,38,31,.25),0 0 20px rgba(224,38,31,.5)}
       50%{box-shadow:0 0 0 4px rgba(224,38,31,.35),0 0 30px rgba(224,38,31,.7)}
     }
+    #provaToggleBtn.on{
+      background:#f59e0b;color:#fff;border-color:#f59e0b;
+      box-shadow:0 0 0 4px rgba(245,158,11,.25), 0 0 20px rgba(245,158,11,.5);
+      animation:prova-pulse 1.6s infinite;
+    }
+    @keyframes prova-pulse{
+      0%,100%{box-shadow:0 0 0 4px rgba(245,158,11,.25),0 0 20px rgba(245,158,11,.5)}
+      50%{box-shadow:0 0 0 4px rgba(245,158,11,.35),0 0 30px rgba(245,158,11,.7)}
+    }
     .live-body{display:grid;gap:8px}
     .live-row{display:flex;gap:6px}
     .live-row > *{flex:1}
@@ -657,6 +666,7 @@
     }
 
     function renderProvaSection(){
+      if (!provaState.open) return '';
       const players = (cache.players || []);
       const numBtns = Array.from({length:20}, (_,i)=> i+1).map(n=>{
         const p = provaState.team==='casa' ? players.find(pl => (pl.numero||'').toString()===String(n)) : null;
@@ -666,40 +676,39 @@
       }).join('');
 
       return `
-        <div class="card" style="padding:12px;border:2px dashed var(--ring)">
-          <button id="provaToggleBtn" class="live-toggle ${provaState.open ? 'on' : ''}" style="font-size:13px;padding:10px">
-            ${provaState.open ? '🧪 PROVA DIRETTA ATTIVA — tocca per fermare' : '🧪 Prova Diretta (solo per te, nessuna notifica)'}
-          </button>
-          ${provaState.open ? `
-            <div style="margin-top:10px">
-              <div class="live-row">
-                <div class="seg-compact" id="provaTeamSeg">
-                  <button class="seg-btn-sm ${provaState.team==='casa'?'active':''}" data-pteam="casa">Corbiolo (rosa vera)</button>
-                  <button class="seg-btn-sm ${provaState.team==='fuori'?'active':''}" data-pteam="fuori">Avversario di prova</button>
-                </div>
-              </div>
-              <div class="live-row" style="margin-top:6px">
-                <div class="seg-compact" id="provaTypeSeg">
-                  <button class="seg-btn-sm ${provaState.eventType==='gol'?'active':''}" data-ptype="gol">⚽ Gol</button>
-                  <button class="seg-btn-sm ${provaState.eventType==='giallo'?'active':''}" data-ptype="giallo">🟨 Giallo</button>
-                  <button class="seg-btn-sm ${provaState.eventType==='rosso'?'active':''}" data-ptype="rosso">🟥 Rosso</button>
-                </div>
-              </div>
-              <div class="num-grid" style="margin-top:8px">${numBtns}</div>
-              <div class="row" style="justify-content:space-between;align-items:center;margin-top:10px">
-                <div class="small" style="font-weight:700">Finta cronaca (solo qui, non salvata)</div>
-                <button id="provaClearBtn" class="btn btn-ghost" style="font-size:11px;padding:5px 8px">🗑️ Svuota</button>
-              </div>
-              <div class="cronaca-box" style="margin-top:6px">
-                ${provaState.eventi.length ? provaState.eventi.map(e=>`<div class="console-row"><span>${e}</span></div>`).reverse().join('') : '<div class="small" style="padding:4px 0">Nessun evento ancora — tocca un numero qui sopra per provare.</div>'}
-              </div>
+        <div class="card" style="padding:10px;border:2px dashed var(--ring);margin-top:8px">
+          <div class="small" style="font-weight:800;margin-bottom:6px">🧪 Prova Diretta — solo per te, nessuna notifica</div>
+          <div class="live-row">
+            <div class="seg-compact" id="provaTeamSeg">
+              <button class="seg-btn-sm ${provaState.team==='casa'?'active':''}" data-pteam="casa">Corbiolo (rosa vera)</button>
+              <button class="seg-btn-sm ${provaState.team==='fuori'?'active':''}" data-pteam="fuori">Avversario di prova</button>
             </div>
-          ` : ''}
+          </div>
+          <div class="live-row" style="margin-top:6px">
+            <div class="seg-compact" id="provaTypeSeg">
+              <button class="seg-btn-sm ${provaState.eventType==='gol'?'active':''}" data-ptype="gol">⚽ Gol</button>
+              <button class="seg-btn-sm ${provaState.eventType==='giallo'?'active':''}" data-ptype="giallo">🟨 Giallo</button>
+              <button class="seg-btn-sm ${provaState.eventType==='rosso'?'active':''}" data-ptype="rosso">🟥 Rosso</button>
+            </div>
+          </div>
+          <div class="num-grid" style="margin-top:8px">${numBtns}</div>
+          <div class="row" style="justify-content:space-between;align-items:center;margin-top:10px">
+            <div class="small" style="font-weight:700">Finta cronaca (solo qui, non salvata)</div>
+            <button id="provaClearBtn" class="btn btn-ghost" style="font-size:11px;padding:5px 8px">🗑️ Svuota</button>
+          </div>
+          <div class="cronaca-box" style="margin-top:6px">
+            ${provaState.eventi.length ? provaState.eventi.map(e=>`<div class="console-row"><span>${e}</span></div>`).reverse().join('') : '<div class="small" style="padding:4px 0">Nessun evento ancora — tocca un numero qui sopra per provare.</div>'}
+          </div>
         </div>`;
     }
 
     function wireProvaSection(zone){
-      $('provaToggleBtn').onclick = ()=>{ provaState.open = !provaState.open; renderLiveTab(); };
+      const toggleBtn = $('provaToggleBtn');
+      toggleBtn.classList.toggle('on', provaState.open);
+      toggleBtn.textContent = provaState.open ? '🧪 Prova Diretta attiva' : '🧪 Prova Diretta';
+      toggleBtn.onclick = ()=>{ provaState.open = !provaState.open; renderLiveTab(); };
+
+      $('provaZone').innerHTML = renderProvaSection();
       if (!provaState.open) return;
 
       zone.querySelectorAll('[data-pteam]').forEach(b=> b.onclick = ()=>{ provaState.team = b.dataset.pteam; renderLiveTab(); });
@@ -737,11 +746,8 @@
 
       if (clockTickTimer){ clearInterval(clockTickTimer); clockTickTimer = null; }
 
-      const provaHtml = renderProvaSection();
-
       if (!match){
-        zone.innerHTML = provaHtml + `<div class="card small" style="margin-top:10px">Nessuna partita disponibile. Creane una nella tab Partite per la diretta vera.</div>`;
-        wireProvaSection(zone);
+        zone.innerHTML = `<div class="card small">Nessuna partita disponibile. Creane una nella tab Partite per la diretta vera.</div>`;
         return;
       }
 
@@ -761,8 +767,7 @@
         return `<button class="num-btn" data-num="${n}" data-name="${p ? (p.nome||'') : ''}" data-display="${p ? displayName : ''}">${label}</button>`;
       }).join('');
 
-      zone.innerHTML = provaHtml + `
-        <div style="height:14px"></div>
+      zone.innerHTML = `
         <div class="live-wrap">
           <select class="live-select" id="liveMatchSelect">${options}</select>
 
@@ -770,7 +775,11 @@
             ${isLive ? '🔴 DIRETTA ATTIVA — tocca per fermare' : '⚪ Diretta ferma — tocca per iniziare'}
           </button>
 
-          <button id="openFullCronacaBtn" class="btn btn-ghost" style="width:100%;justify-content:center;font-size:12px">📓 Modifica cronaca completa (anche partite passate)</button>
+          <div class="row" style="gap:8px">
+            <button id="openFullCronacaBtn" class="btn btn-ghost" style="flex:1;justify-content:center;font-size:12px">📓 Modifica cronaca completa</button>
+            <button id="provaToggleBtn" class="btn btn-ghost" style="flex:1;justify-content:center;font-size:12px">🧪 Prova Diretta</button>
+          </div>
+          <div id="provaZone"></div>
 
           <div class="live-body" id="liveBody">
             <div class="live-row">
