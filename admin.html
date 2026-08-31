@@ -781,6 +781,7 @@
           </div>
           <div id="provaZone"></div>
 
+          ${!provaState.open ? `
           <div class="live-body" id="liveBody">
             <div class="live-row">
               <div class="seg-compact" id="periodSeg">
@@ -825,6 +826,7 @@
                 </div>`).reverse().join('') : '<div class="small" style="padding:4px 0">Nessun evento ancora.</div>'}
             </div>
           </div>
+          ` : ''}
         </div>`;
 
       $('liveMatchSelect').onchange = (e)=>{ liveState.matchId = e.target.value; liveState.team = corbSide; renderLiveTab(); };
@@ -832,16 +834,21 @@
       $('openFullCronacaBtn').onclick = ()=> { ensureSubscribed('players'); openCronacaEditor(match); };
       wireProvaSection(zone);
 
-      zone.querySelectorAll('[data-period]').forEach(b=> b.onclick = ()=> setPeriod(match, b.dataset.period));
-      zone.querySelectorAll('[data-team]').forEach(b=> b.onclick = ()=>{ liveState.team = b.dataset.team; renderLiveTab(); });
-      zone.querySelectorAll('[data-type]').forEach(b=> b.onclick = ()=>{ liveState.eventType = b.dataset.type; renderLiveTab(); });
+      if (!provaState.open){
+        zone.querySelectorAll('[data-period]').forEach(b=> b.onclick = ()=> setPeriod(match, b.dataset.period));
+        zone.querySelectorAll('[data-team]').forEach(b=> b.onclick = ()=>{ liveState.team = b.dataset.team; renderLiveTab(); });
+        zone.querySelectorAll('[data-type]').forEach(b=> b.onclick = ()=>{ liveState.eventType = b.dataset.type; renderLiveTab(); });
 
-      $('minMinus').onclick = ()=> adjustMinute(match, -1);
-      $('minPlus').onclick  = ()=> adjustMinute(match, 1);
-      const resumeBtn = $('resumeClockBtn');
-      if (resumeBtn) resumeBtn.onclick = ()=> resumeClock(match);
+        $('minMinus').onclick = ()=> adjustMinute(match, -1);
+        $('minPlus').onclick  = ()=> adjustMinute(match, 1);
+        const resumeBtn = $('resumeClockBtn');
+        if (resumeBtn) resumeBtn.onclick = ()=> resumeClock(match);
 
-      zone.querySelectorAll('.num-btn').forEach(b=>{
+        // Scoperto sul campo: usare zone.querySelectorAll('.num-btn') qui prendeva
+        // ANCHE i numeri della sezione Prova (stessa classe), mandando per sbaglio
+        // in cronaca vera quello che si toccava nella prova. Ora cerco SOLO dentro
+        // la griglia numeri vera.
+        document.getElementById('numGrid').querySelectorAll('.num-btn').forEach(b=>{
         b.onclick = async ()=>{
           const n = b.dataset.num;
           const name = b.dataset.name;         // nome vero, serve per i marcatori
@@ -877,13 +884,14 @@
         };
       });
 
-      $('timeOutBtn').onclick  = ()=> timeOut(match);
-      $('endHalfBtn').onclick  = ()=> endHalf(match);
-      $('endMatchBtn').onclick = ()=> endMatch(match);
+        $('timeOutBtn').onclick  = ()=> timeOut(match);
+        $('endHalfBtn').onclick  = ()=> endHalf(match);
+        $('endMatchBtn').onclick = ()=> endMatch(match);
 
-      zone.querySelectorAll('.x').forEach(x=>{
-        x.onclick = ()=> removeLiveEvent(match, +x.dataset.idx);
-      });
+        zone.querySelectorAll('.x').forEach(x=>{
+          x.onclick = ()=> removeLiveEvent(match, +x.dataset.idx);
+        });
+      }
 
       // Aggiorna il minuto a schermo ogni 15s senza ricostruire tutta la console
       // (per non interrompere un tap in corso), solo se il cronometro è avviato.
