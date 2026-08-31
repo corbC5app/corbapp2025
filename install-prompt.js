@@ -144,17 +144,27 @@
 
   if (alreadyInstalled() || recentlyDismissed()) return;
 
+  // Se il tutorial iniziale è aperto, aspetta che si chiuda prima di mostrare
+  // il banner di installazione, per non sovrapporre due popup insieme.
+  function waitForOnboarding(fn, delay){
+    function tryShow(){
+      if (window.__corbOnboardingOpen) { setTimeout(tryShow, 500); return; }
+      setTimeout(fn, delay);
+    }
+    tryShow();
+  }
+
   // --- Android / Chrome / Edge: popup nativo reale ---
   let deferredPrompt = null;
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
     deferredPromptGlobal = e;
-    setTimeout(() => showAndroidPrompt(deferredPrompt), 1200);
+    waitForOnboarding(() => showAndroidPrompt(deferredPrompt), 1200);
   });
 
   // --- iPhone/iPad: nessun evento nativo possibile, mostriamo istruzioni ---
   if (isIOS() && !alreadyInstalled()){
-    setTimeout(showIOSInstructions, 1500);
+    waitForOnboarding(showIOSInstructions, 1500);
   }
 })();
