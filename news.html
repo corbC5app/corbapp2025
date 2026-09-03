@@ -19,6 +19,7 @@
 
     /* Immagini 16:9 fluide */
     .media-fluid{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:12px;margin-bottom:10px}
+    .news-thumb{width:60px;height:60px;object-fit:cover;border-radius:10px;flex-shrink:0}
 
     /* Contenuto collassabile: di base clamp a 3 righe */
     .content{color:var(--text)}
@@ -134,9 +135,14 @@
     function tmpl(n){
       return `
         <article class="card news-item" data-id="${n.id}">
-          ${n.img ? `<img src="${n.img}" alt="" class="media-fluid" loading="lazy" onerror="this.style.display='none'">` : ''}
-          <span class="pill">${n.tag}</span>
-          <h3 style="margin:6px 0 6px 0">${n.titolo}</h3>
+          <div class="row" style="justify-content:space-between;align-items:flex-start;gap:10px">
+            <div style="flex:1;min-width:0">
+              <span class="pill">${n.tag}</span>
+              <h3 style="margin:6px 0 6px 0">${n.titolo}</h3>
+            </div>
+            ${n.img ? `<img src="${n.img}" alt="" class="news-thumb" loading="lazy" onerror="this.style.display='none'">` : ''}
+          </div>
+          ${n.img ? `<img src="${n.img}" alt="" class="media-fluid news-full" loading="lazy" style="display:none" onerror="this.style.display='none'">` : ''}
           <div class="small content clamp">${n.contenuto}</div>
           <button class="toggle" aria-expanded="false">Mostra tutto ⌄</button>
         </article>`;
@@ -179,15 +185,18 @@
       if(!btn) return;
       const card = btn.closest('.news-item');
       const content = card.querySelector('.content');
+      const fullImg = card.querySelector('.news-full');
       const expanded = btn.getAttribute('aria-expanded') === 'true';
       if (expanded){
         content.classList.add('clamp');
         btn.setAttribute('aria-expanded','false');
         btn.textContent = 'Mostra tutto ⌄';
+        if (fullImg) fullImg.style.display = 'none';
       } else {
         content.classList.remove('clamp');
         btn.setAttribute('aria-expanded','true');
         btn.textContent = 'Chiudi ∧';
+        if (fullImg) fullImg.style.display = 'block';
       }
     });
 

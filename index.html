@@ -35,6 +35,7 @@
     .news-mini .item:last-child{border-bottom:0}
     .news-mini .title{font-weight:800;color:#fff;margin-bottom:6px}
     .news-mini .excerpt{color:#f3f3f3;opacity:.95}
+    .news-mini-thumb{width:50px;height:50px;object-fit:cover;border-radius:8px;flex-shrink:0}
     .ellipsis{-webkit-line-clamp:2;display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}
     .day-overlay{
       position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.45);
@@ -344,15 +345,24 @@
     });
 
     const wrap = document.getElementById('newsPreview');
+    const normalizeImageUrl = (u) => {
+      if (!u) return '';
+      if (/^https?:\/\//i.test(u)) return u;
+      return u.startsWith('./') || u.startsWith('img/') ? u : ('img/' + u);
+    };
+
     subscribeNews((rows) => {
       const news = rows
-        .map(n=>({titolo:n.titolo||'', contenuto:n.contenuto||''}))
+        .map(n=>({titolo:n.titolo||'', contenuto:n.contenuto||'', img: normalizeImageUrl(n.img||'')}))
         .slice(0, 2);
       wrap.innerHTML = news.length
         ? news.map(n=>`
-            <a class="item" href="./news.html">
-              <div class="title">${n.titolo}</div>
-              <div class="excerpt ellipsis small">${n.contenuto}</div>
+            <a class="item" href="./news.html" style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+              <div style="flex:1;min-width:0">
+                <div class="title">${n.titolo}</div>
+                <div class="excerpt ellipsis small">${n.contenuto}</div>
+              </div>
+              ${n.img ? `<img src="${n.img}" alt="" class="news-mini-thumb" loading="lazy" onerror="this.style.display='none'">` : ''}
             </a>`).join('')
         : '<div class="small" style="color:#f3f3f3">Nessuna notizia disponibile</div>';
     });
