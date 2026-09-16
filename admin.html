@@ -933,6 +933,7 @@
       let quickOpen = false;
       let quickTeam = corbSide;
       let quickType = 'gol';
+      let editingIndex = null; // se non-null, il prossimo numero toccato SOSTITUISCE questa riga invece di aggiungerne una nuova
 
       function draw(){
         const players = cache.players || [];
@@ -950,8 +951,14 @@
           </div>
 
           <button id="quickToggleBtn" class="btn btn-ghost" style="width:100%;justify-content:space-between;font-size:13px;margin-top:10px">
-            <span>⚡ Inserimento rapido evento</span><span>${quickOpen ? '▲' : '▼'}</span>
+            <span>${editingIndex!==null ? '✏️ Sostituisci la riga selezionata' : '⚡ Inserimento rapido evento'}</span><span>${quickOpen ? '▲' : '▼'}</span>
           </button>
+          ${editingIndex!==null ? `
+            <div class="row" style="justify-content:space-between;align-items:center;margin-top:6px;background:#fff3cd;border-radius:10px;padding:8px 10px">
+              <span class="small" style="color:#7a5d18">Tocca un numero: sostituirà la riga ${editingIndex+1}</span>
+              <button id="cancelEditBtn" class="btn btn-ghost" style="font-size:11px;padding:4px 8px">Annulla</button>
+            </div>
+          ` : ''}
           ${quickOpen ? `
             <div style="border:1px solid var(--ring);border-radius:12px;padding:10px;margin-top:8px">
               <div class="seg-compact">
@@ -970,7 +977,7 @@
 
           <div style="margin-top:12px" id="cronacaLines">
             ${tempEventi.map((e,i)=>`
-              <div class="cronaca-line">
+              <div class="cronaca-line" style="${editingIndex===i ? 'background:#fff3cd;border-radius:8px;padding:4px' : ''}">
                 <input type="text" data-idx="${i}" value="${e.replace(/"/g,'&quot;')}">
                 <span class="edit-pen" data-idx="${i}">✏️</span>
                 <span class="x" data-idx="${i}">✕</span>
@@ -991,7 +998,13 @@
             const teamName = quickTeam==='casa' ? (match.casa||'Corbiolo') : (match.fuori||'Avversario');
             const emoji = quickType==='gol' ? '⚽' : quickType==='autogol' ? '🥅' : quickType==='giallo' ? '🟨' : '🟥';
             const who = name ? `${name} (#${n})` : `Numero ${n}`;
-            tempEventi.push(`${emoji} ${who} — ${teamName}`);
+            const nuovaRiga = `${emoji} ${who} — ${teamName}`;
+            if (editingIndex !== null){
+              tempEventi[editingIndex] = nuovaRiga;
+              editingIndex = null;
+            } else {
+              tempEventi.push(nuovaRiga);
+            }
             draw();
           };
         });
@@ -1001,13 +1014,20 @@
         });
         cronacaCard.querySelectorAll('#cronacaLines .edit-pen').forEach(pen=>{
           pen.onclick = ()=>{
-            const inp = cronacaCard.querySelector(`#cronacaLines input[data-idx="${pen.dataset.idx}"]`);
-            if (inp){ inp.focus(); inp.select(); }
+            editingIndex = +pen.dataset.idx;
+            quickOpen = true; // apre da sola la griglia numeri, pronta per la sostituzione
+            draw();
           };
         });
         cronacaCard.querySelectorAll('#cronacaLines .x').forEach(x=>{
-          x.onclick = ()=>{ tempEventi.splice(+x.dataset.idx, 1); draw(); };
+          x.onclick = ()=>{
+            if (editingIndex === +x.dataset.idx) editingIndex = null;
+            tempEventi.splice(+x.dataset.idx, 1);
+            draw();
+          };
         });
+        const cancelEditBtn = document.getElementById('cancelEditBtn');
+        if (cancelEditBtn) cancelEditBtn.onclick = ()=>{ editingIndex = null; draw(); };
         document.getElementById('addLineBtn').onclick = ()=>{ tempEventi.push(''); draw(); };
         document.getElementById('closeCronaca').onclick = ()=> cronacaOverlay.style.display='none';
         document.getElementById('cancelCronacaBtn').onclick = ()=> cronacaOverlay.style.display='none';
