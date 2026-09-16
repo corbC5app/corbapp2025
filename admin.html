@@ -94,6 +94,7 @@
     .cronaca-line{display:flex;gap:6px;align-items:center;margin-bottom:6px}
     .cronaca-line input{flex:1;border:1px solid var(--ring);border-radius:8px;padding:6px 8px;background:var(--card);color:var(--text);font-size:13px}
     .cronaca-line .x{cursor:pointer;color:var(--red);font-size:16px;flex-shrink:0}
+    .cronaca-line .edit-pen{cursor:pointer;font-size:15px;flex-shrink:0}
   </style>
 </head>
 <body>
@@ -971,6 +972,7 @@
             ${tempEventi.map((e,i)=>`
               <div class="cronaca-line">
                 <input type="text" data-idx="${i}" value="${e.replace(/"/g,'&quot;')}">
+                <span class="edit-pen" data-idx="${i}">✏️</span>
                 <span class="x" data-idx="${i}">✕</span>
               </div>`).join('') || '<div class="small" style="margin-bottom:8px">Nessun evento ancora.</div>'}
           </div>
@@ -996,6 +998,12 @@
 
         cronacaCard.querySelectorAll('#cronacaLines input').forEach(inp=>{
           inp.oninput = ()=>{ tempEventi[+inp.dataset.idx] = inp.value; };
+        });
+        cronacaCard.querySelectorAll('#cronacaLines .edit-pen').forEach(pen=>{
+          pen.onclick = ()=>{
+            const inp = cronacaCard.querySelector(`#cronacaLines input[data-idx="${pen.dataset.idx}"]`);
+            if (inp){ inp.focus(); inp.select(); }
+          };
         });
         cronacaCard.querySelectorAll('#cronacaLines .x').forEach(x=>{
           x.onclick = ()=>{ tempEventi.splice(+x.dataset.idx, 1); draw(); };
