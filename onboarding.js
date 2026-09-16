@@ -50,6 +50,21 @@
     localStorage.setItem(SEEN_KEY, '1');
     window.__corbOnboardingOpen = false;
     document.getElementById('corb-onb-overlay')?.remove();
+    requestNotificationsQuietly();
+  }
+
+  // Le notifiche partono "di default": appena il tutorial si chiude (con
+  // Salta o con Inizia!), chiediamo subito il permesso, invece di lasciare
+  // che la persona debba andare da sola in Impostazioni a cercarlo. Se
+  // rifiuta o non è supportato, non succede nulla di rotto: potrà comunque
+  // attivarle dopo da Impostazioni quando vuole.
+  function requestNotificationsQuietly(){
+    if (localStorage.getItem('corb-notif-enabled') === 'yes') return; // già attive
+    import('./notify.js').then(({ enableNotifications }) => {
+      enableNotifications().then(() => {
+        localStorage.setItem('corb-notif-enabled', 'yes');
+      }).catch(() => {}); // negato/non supportato: nessun problema, restano disattivabili/attivabili da Impostazioni
+    }).catch(() => {});
   }
 
   function render(){

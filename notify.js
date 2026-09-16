@@ -68,7 +68,7 @@ export async function enableNotifications(onStep){
     // Se è la notifica di un gol e la persona sta già guardando l'app aperta,
     // non serve un popup in più: il tabellone live si aggiorna già da solo
     // sotto i loro occhi in tempo reale.
-    if (payload?.data?.kind === 'gol' && document.visibilityState === 'visible') return;
+    if ((payload?.data?.kind === 'gol' || payload?.data?.kind === 'autogol') && document.visibilityState === 'visible') return;
 
     const title = payload?.notification?.title || 'CORB';
     const body  = payload?.notification?.body  || '';

@@ -201,7 +201,12 @@
               ? eventi.map(e=>`<div style="padding:6px 0;border-bottom:1px solid var(--ring);font-size:13px">${e}</div>`).join('')
               : '<div class="small" style="padding:6px 0">Nessuna cronaca registrata per questa partita.</div>'}
           </div>
-        </div>`;
+        </div>
+        ${m.commento ? `
+        <div style="margin-top:12px;border-top:1px solid var(--ring);padding-top:8px">
+          <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px">COMMENTO</div>
+          <div style="font-size:13px;line-height:1.5">${m.commento}</div>
+        </div>` : ''}`;
       matchDetailOverlay.style.display = 'flex';
       document.getElementById('closeMatchDetail').onclick = ()=> matchDetailOverlay.style.display='none';
     }

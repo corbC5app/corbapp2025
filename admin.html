@@ -283,6 +283,7 @@
           {key:'logo_fuori', label:'Logo trasferta (URL, opzionale)', type:'text'},
           {key:'stato', label:'Stato partita', type:'select', options:['Regolare','Rinviata','Annullata']},
           {key:'speciale', label:'Partita speciale (derby/big match)', type:'select', options:['No','Sì']},
+          {key:'commento', label:'Commento partita (facoltativo, visibile ai tifosi)', type:'textarea'},
           {key:'live', label:'In diretta ORA?', type:'select', options:['No','Sì']},
         ],
         itemLabel: (m)=> `${m.data||'?'} ${m.ora||''} — ${m.casa||'Corbiolo'} vs ${m.fuori||'Avversario'} ${m.risultato ? '('+m.risultato+')' : ''} ${m.stagione ? '· '+m.stagione : ''} ${m.stato && m.stato!=='Regolare' ? '⚠️ '+m.stato : ''}`,
@@ -530,7 +531,7 @@
     const provaState = { open:false, team:'casa', eventType:'gol', eventi:[] };
 
     function periodLabel(p){ return p==='1T' ? '1°T' : p==='2T' ? '2°T' : 'Rec.'; }
-    function eventEmoji(t){ return t==='gol' ? '⚽' : t==='giallo' ? '🟨' : '🟥'; }
+    function eventEmoji(t){ return t==='gol' ? '⚽' : t==='autogol' ? '🥅' : t==='giallo' ? '🟨' : '🟥'; }
 
     // Il minuto non è salvato "fisso": si calcola da quando è partito il cronometro.
     // Così resta preciso anche se chiudi e riapri la pagina, e i tifosi vedono lo stesso valore.
@@ -687,6 +688,7 @@
           <div class="live-row" style="margin-top:6px">
             <div class="seg-compact" id="provaTypeSeg">
               <button class="seg-btn-sm ${provaState.eventType==='gol'?'active':''}" data-ptype="gol">⚽ Gol</button>
+              <button class="seg-btn-sm ${provaState.eventType==='autogol'?'active':''}" data-ptype="autogol">🥅 OG</button>
               <button class="seg-btn-sm ${provaState.eventType==='giallo'?'active':''}" data-ptype="giallo">🟨 Giallo</button>
               <button class="seg-btn-sm ${provaState.eventType==='rosso'?'active':''}" data-ptype="rosso">🟥 Rosso</button>
             </div>
@@ -722,7 +724,7 @@
           const displayName = b.dataset.display;
           const teamName = provaState.team==='casa' ? 'Corbiolo' : 'Avversario di prova';
           const who = displayName ? `${displayName} (#${n})` : `Numero ${n}`;
-          const emoji = provaState.eventType==='gol' ? '⚽' : provaState.eventType==='giallo' ? '🟨' : '🟥';
+          const emoji = provaState.eventType==='gol' ? '⚽' : provaState.eventType==='autogol' ? '🥅' : provaState.eventType==='giallo' ? '🟨' : '🟥';
           provaState.eventi.push(`${emoji} ${who} — ${teamName}`);
           renderLiveTab();
         };
@@ -805,6 +807,7 @@
               </div>
               <div class="seg-compact" id="typeSeg">
                 <button class="seg-btn-sm ${liveState.eventType==='gol'?'active':''}" data-type="gol">⚽</button>
+                <button class="seg-btn-sm ${liveState.eventType==='autogol'?'active':''}" data-type="autogol">🥅 OG</button>
                 <button class="seg-btn-sm ${liveState.eventType==='giallo'?'active':''}" data-type="giallo">🟨</button>
                 <button class="seg-btn-sm ${liveState.eventType==='rosso'?'active':''}" data-type="rosso">🟥</button>
               </div>
@@ -859,13 +862,24 @@
           const who = displayName ? `${displayName} (#${n})` : `Numero ${n}`;
           const label = `${eventEmoji(liveState.eventType)} ${who} — ${teamName}`;
 
+          // Conta un punto per "teamNameToCheck" leggendo una riga di cronaca:
+          // gol normale → il punto va alla squadra scritta nella riga;
+          // autogol → il punto va all'ALTRA squadra (chi segna nella propria porta).
+          function pointFor(eventLine, teamNameToCheck, otherTeamName){
+            if (eventLine.includes('⚽')) return eventLine.includes('— '+teamNameToCheck) ? 1 : 0;
+            if (eventLine.includes('🥅')) return eventLine.includes('— '+otherTeamName) ? 1 : 0;
+            return 0;
+          }
+
           let extra = {};
-          if (liveState.eventType === 'gol'){
-            // Ricalcolo il risultato contando i gol già segnati + questo nuovo,
-            // così il punteggio resta sempre allineato senza scriverlo a mano.
+          if (liveState.eventType === 'gol' || liveState.eventType === 'autogol'){
+            // Ricalcolo il risultato contando i gol (e autogol) già segnati + questo
+            // nuovo, così il punteggio resta sempre allineato senza scriverlo a mano.
             const prevEventi = Array.isArray(match.eventi) ? match.eventi : [];
-            const golCasa  = prevEventi.filter(e => e.includes('⚽') && e.includes('— '+casaNome)).length + (liveState.team==='casa'?1:0);
-            const golFuori = prevEventi.filter(e => e.includes('⚽') && e.includes('— '+fuoriNome)).length + (liveState.team==='fuori'?1:0);
+            let golCasa  = prevEventi.reduce((s,e)=> s + pointFor(e, casaNome, fuoriNome), 0);
+            let golFuori = prevEventi.reduce((s,e)=> s + pointFor(e, fuoriNome, casaNome), 0);
+            golCasa  += pointFor(label, casaNome, fuoriNome);
+            golFuori += pointFor(label, fuoriNome, casaNome);
             extra.risultato = `${golCasa}-${golFuori}`;
           }
 
@@ -873,6 +887,7 @@
 
           // Gol di un giocatore riconosciuto della vostra rosa: aggiorna subito
           // il suo contatore marcatori, senza aspettare la fine della partita.
+          // L'autogol NON conta come gol personale, quindi resta escluso.
           const tipoConta = (match.tipo||'Campionato') === 'Campionato' || (match.tipo||'') === 'Coppa';
           if (liveState.eventType === 'gol' && liveState.team === corbSide && name && tipoConta){
             const p = players.find(pl => (pl.nome||'') === name);
@@ -944,6 +959,7 @@
               </div>
               <div class="seg-compact" style="margin-top:6px">
                 <button class="seg-btn-sm ${quickType==='gol'?'active':''}" data-qtype="gol">⚽ Gol</button>
+                <button class="seg-btn-sm ${quickType==='autogol'?'active':''}" data-qtype="autogol">🥅 OG</button>
                 <button class="seg-btn-sm ${quickType==='giallo'?'active':''}" data-qtype="giallo">🟨 Giallo</button>
                 <button class="seg-btn-sm ${quickType==='rosso'?'active':''}" data-qtype="rosso">🟥 Rosso</button>
               </div>
@@ -971,7 +987,7 @@
           b.onclick = ()=>{
             const n = b.dataset.num, name = b.dataset.name;
             const teamName = quickTeam==='casa' ? (match.casa||'Corbiolo') : (match.fuori||'Avversario');
-            const emoji = quickType==='gol' ? '⚽' : quickType==='giallo' ? '🟨' : '🟥';
+            const emoji = quickType==='gol' ? '⚽' : quickType==='autogol' ? '🥅' : quickType==='giallo' ? '🟨' : '🟥';
             const who = name ? `${name} (#${n})` : `Numero ${n}`;
             tempEventi.push(`${emoji} ${who} — ${teamName}`);
             draw();
