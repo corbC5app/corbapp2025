@@ -724,7 +724,7 @@
           const n = b.dataset.num;
           const displayName = b.dataset.display;
           const teamName = provaState.team==='casa' ? 'Corbiolo' : 'Avversario di prova';
-          const who = displayName ? `${displayName} (#${n})` : `Numero ${n}`;
+          const who = provaState.eventType==='autogol' ? `Autogol (#${n})` : (displayName ? `${displayName} (#${n})` : `Numero ${n}`);
           const emoji = provaState.eventType==='gol' ? '⚽' : provaState.eventType==='autogol' ? '🥅' : provaState.eventType==='giallo' ? '🟨' : '🟥';
           provaState.eventi.push(`${emoji} ${who} — ${teamName}`);
           renderLiveTab();
@@ -860,9 +860,7 @@
           const casaNome = match.casa || 'Corbiolo';
           const fuoriNome = match.fuori || 'Avversario';
           const teamName = liveState.team==='casa' ? casaNome : fuoriNome;
-          const who = displayName ? `${displayName} (#${n})` : `Numero ${n}`;
-
-          // Conta un punto per "teamNameToCheck" leggendo una riga di cronaca:
+          const who = liveState.eventType==='autogol' ? `Autogol (#${n})` : (displayName ? `${displayName} (#${n})` : `Numero ${n}`);
           // gol normale → il punto va alla squadra scritta nella riga;
           // autogol → il punto va all'ALTRA squadra (chi segna nella propria porta).
           function pointFor(eventLine, teamNameToCheck, otherTeamName){
@@ -1030,7 +1028,7 @@
             const fuoriNome = match.fuori || 'Avversario';
             const teamName = quickTeam==='casa' ? casaNome : fuoriNome;
             const emoji = quickType==='gol' ? '⚽' : quickType==='autogol' ? '🥅' : quickType==='giallo' ? '🟨' : '🟥';
-            const who = name ? `${name} (#${n})` : `Numero ${n}`;
+            const who = quickType==='autogol' ? `Autogol (#${n})` : (name ? `${name} (#${n})` : `Numero ${n}`);
 
             let scorePrefix = '';
             if (quickType === 'gol' || quickType === 'autogol'){
