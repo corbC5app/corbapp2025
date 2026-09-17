@@ -861,7 +861,6 @@
           const fuoriNome = match.fuori || 'Avversario';
           const teamName = liveState.team==='casa' ? casaNome : fuoriNome;
           const who = displayName ? `${displayName} (#${n})` : `Numero ${n}`;
-          const label = `${eventEmoji(liveState.eventType)} ${who} — ${teamName}`;
 
           // Conta un punto per "teamNameToCheck" leggendo una riga di cronaca:
           // gol normale → il punto va alla squadra scritta nella riga;
@@ -873,17 +872,20 @@
           }
 
           let extra = {};
+          let scorePrefix = '';
           if (liveState.eventType === 'gol' || liveState.eventType === 'autogol'){
-            // Ricalcolo il risultato contando i gol (e autogol) già segnati + questo
-            // nuovo, così il punteggio resta sempre allineato senza scriverlo a mano.
+            // Ricalcolo il risultato PRIMA di scrivere la riga, così lo posso
+            // includere subito dopo l'icona (tempo, minuto, icona, risultato, nome).
             const prevEventi = Array.isArray(match.eventi) ? match.eventi : [];
             let golCasa  = prevEventi.reduce((s,e)=> s + pointFor(e, casaNome, fuoriNome), 0);
             let golFuori = prevEventi.reduce((s,e)=> s + pointFor(e, fuoriNome, casaNome), 0);
-            golCasa  += pointFor(label, casaNome, fuoriNome);
-            golFuori += pointFor(label, fuoriNome, casaNome);
+            const scoringIsCasa = liveState.eventType === 'autogol' ? (liveState.team === 'fuori') : (liveState.team === 'casa');
+            if (scoringIsCasa) golCasa++; else golFuori++;
             extra.risultato = `${golCasa}-${golFuori}`;
+            scorePrefix = `${golCasa}-${golFuori} `;
           }
 
+          const label = `${eventEmoji(liveState.eventType)} ${scorePrefix}${who} — ${teamName}`;
           await addLiveEvent(match, label, extra);
 
           // Gol di un giocatore riconosciuto della vostra rosa: aggiorna subito
@@ -934,6 +936,10 @@
       let quickTeam = corbSide;
       let quickType = 'gol';
       let editingIndex = null; // se non-null, il prossimo numero toccato SOSTITUISCE questa riga invece di aggiungerne una nuova
+      let quickPeriod = '1T';
+      let quickMinuto = 0;
+      let commentoOpen = false;
+      let commentoText = match.commento || '';
 
       function draw(){
         const players = cache.players || [];
@@ -961,7 +967,19 @@
           ` : ''}
           ${quickOpen ? `
             <div style="border:1px solid var(--ring);border-radius:12px;padding:10px;margin-top:8px">
-              <div class="seg-compact">
+              <div class="live-row">
+                <div class="seg-compact" id="quickPeriodSeg">
+                  <button class="seg-btn-sm ${quickPeriod==='1T'?'active':''}" data-qperiod="1T">1°T</button>
+                  <button class="seg-btn-sm ${quickPeriod==='2T'?'active':''}" data-qperiod="2T">2°T</button>
+                  <button class="seg-btn-sm ${quickPeriod==='REC'?'active':''}" data-qperiod="REC">Rec.</button>
+                </div>
+                <div class="minute-stepper">
+                  <button id="quickMinMinus">−</button>
+                  <span id="quickMinVal">${quickMinuto}'</span>
+                  <button id="quickMinPlus">+</button>
+                </div>
+              </div>
+              <div class="seg-compact" style="margin-top:6px">
                 <button class="seg-btn-sm ${quickTeam==='casa'?'active':''}" data-qteam="casa">${match.casa||'Corbiolo'}</button>
                 <button class="seg-btn-sm ${quickTeam==='fuori'?'active':''}" data-qteam="fuori">${match.fuori||'Avversario'}</button>
               </div>
@@ -984,21 +1002,53 @@
               </div>`).join('') || '<div class="small" style="margin-bottom:8px">Nessun evento ancora.</div>'}
           </div>
           <button id="addLineBtn" class="btn btn-ghost" style="width:100%;justify-content:center;font-size:13px;margin-top:4px">➕ Aggiungi riga vuota</button>
+
+          <button id="commentoToggleBtn" class="btn btn-ghost" style="width:100%;justify-content:space-between;font-size:13px;margin-top:10px">
+            <span>💬 Commento partita ${commentoText.trim() ? '(scritto)' : ''}</span><span>${commentoOpen ? '▲' : '▼'}</span>
+          </button>
+          ${commentoOpen ? `
+            <textarea id="commentoInput" rows="3" style="width:100%;margin-top:8px;border:1px solid var(--ring);border-radius:10px;padding:8px;background:var(--card);color:var(--text);font-size:13px;box-sizing:border-box">${commentoText}</textarea>
+          ` : ''}
+
           <div class="row" style="margin-top:14px;gap:8px">
             <button id="saveCronacaBtn" class="btn btn-primary" style="flex:1;justify-content:center">💾 Salva</button>
             <button id="cancelCronacaBtn" class="btn btn-ghost" style="flex:1;justify-content:center">Annulla</button>
           </div>`;
 
         document.getElementById('quickToggleBtn').onclick = ()=>{ quickOpen = !quickOpen; draw(); };
+        cronacaCard.querySelectorAll('[data-qperiod]').forEach(b=> b.onclick = ()=>{ quickPeriod = b.dataset.qperiod; draw(); });
+        const qMinMinus = document.getElementById('quickMinMinus');
+        const qMinPlus = document.getElementById('quickMinPlus');
+        if (qMinMinus) qMinMinus.onclick = ()=>{ quickMinuto = Math.max(0, quickMinuto-1); draw(); };
+        if (qMinPlus) qMinPlus.onclick = ()=>{ quickMinuto = quickMinuto+1; draw(); };
         cronacaCard.querySelectorAll('[data-qteam]').forEach(b=> b.onclick = ()=>{ quickTeam = b.dataset.qteam; draw(); });
         cronacaCard.querySelectorAll('[data-qtype]').forEach(b=> b.onclick = ()=>{ quickType = b.dataset.qtype; draw(); });
         cronacaCard.querySelectorAll('.num-btn').forEach(b=>{
           b.onclick = ()=>{
             const n = b.dataset.num, name = b.dataset.name;
-            const teamName = quickTeam==='casa' ? (match.casa||'Corbiolo') : (match.fuori||'Avversario');
+            const casaNome = match.casa || 'Corbiolo';
+            const fuoriNome = match.fuori || 'Avversario';
+            const teamName = quickTeam==='casa' ? casaNome : fuoriNome;
             const emoji = quickType==='gol' ? '⚽' : quickType==='autogol' ? '🥅' : quickType==='giallo' ? '🟨' : '🟥';
             const who = name ? `${name} (#${n})` : `Numero ${n}`;
-            const nuovaRiga = `${emoji} ${who} — ${teamName}`;
+
+            let scorePrefix = '';
+            if (quickType === 'gol' || quickType === 'autogol'){
+              function pointFor(eventLine, teamNameToCheck, otherTeamName){
+                if (eventLine.includes('⚽')) return eventLine.includes('— '+teamNameToCheck) ? 1 : 0;
+                if (eventLine.includes('🥅')) return eventLine.includes('— '+otherTeamName) ? 1 : 0;
+                return 0;
+              }
+              // Conto sulle righe già presenti (esclusa quella in modifica, se c'è)
+              const righeEsistenti = tempEventi.filter((_,i)=> i !== editingIndex);
+              let golCasa  = righeEsistenti.reduce((s,e)=> s + pointFor(e, casaNome, fuoriNome), 0);
+              let golFuori = righeEsistenti.reduce((s,e)=> s + pointFor(e, fuoriNome, casaNome), 0);
+              const scoringIsCasa = quickType === 'autogol' ? (quickTeam === 'fuori') : (quickTeam === 'casa');
+              if (scoringIsCasa) golCasa++; else golFuori++;
+              scorePrefix = `${golCasa}-${golFuori} `;
+            }
+
+            const nuovaRiga = `${periodLabel(quickPeriod)} ${quickMinuto}' ${emoji} ${scorePrefix}${who} — ${teamName}`;
             if (editingIndex !== null){
               tempEventi[editingIndex] = nuovaRiga;
               editingIndex = null;
@@ -1029,12 +1079,15 @@
         const cancelEditBtn = document.getElementById('cancelEditBtn');
         if (cancelEditBtn) cancelEditBtn.onclick = ()=>{ editingIndex = null; draw(); };
         document.getElementById('addLineBtn').onclick = ()=>{ tempEventi.push(''); draw(); };
+        document.getElementById('commentoToggleBtn').onclick = ()=>{ commentoOpen = !commentoOpen; draw(); };
+        const commentoInput = document.getElementById('commentoInput');
+        if (commentoInput) commentoInput.oninput = ()=>{ commentoText = commentoInput.value; };
         document.getElementById('closeCronaca').onclick = ()=> cronacaOverlay.style.display='none';
         document.getElementById('cancelCronacaBtn').onclick = ()=> cronacaOverlay.style.display='none';
         document.getElementById('saveCronacaBtn').onclick = async ()=>{
           const cleaned = tempEventi.map(e=>e.trim()).filter(Boolean);
           try{
-            await Matches.update(match.id, { eventi: cleaned });
+            await Matches.update(match.id, { eventi: cleaned, commento: commentoText.trim() });
             cronacaOverlay.style.display='none';
             showMsg('Cronaca aggiornata.', 'ok');
           }catch(err){ showMsg('Errore: '+err.message, 'err'); }
