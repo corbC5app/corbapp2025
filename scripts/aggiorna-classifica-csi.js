@@ -47,20 +47,37 @@ async function main(){
   console.log('Apro un browser vero (finto) per leggere la pagina...');
   const browser = await puppeteer.launch({
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    args: [
+      '--no-sandbox', '--disable-setuid-sandbox',
+      '--disable-blink-features=AutomationControlled', // nasconde il segnale "sono un robot"
+    ]
   });
   let html, bodyText;
   try {
     const page = await browser.newPage();
+    // Tolgo il segnale navigator.webdriver che i siti usano per riconoscere
+    // Puppeteer/Selenium, prima ancora che la pagina inizi a caricarsi.
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    });
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36');
     await page.setExtraHTTPHeaders({ 'Accept-Language': 'it-IT,it;q=0.9' });
+    await page.setViewport({ width: 1280, height: 900 });
     await page.goto(URL, { waitUntil: 'networkidle2', timeout: 60000 });
-    await page.waitForSelector('body', { timeout: 20000 }).catch(() => {});
-    // Aspetto un attimo in più: la classifica a volte si popola con un
-    // secondo passaggio JS dopo il caricamento iniziale della pagina.
-    await new Promise(res => setTimeout(res, 3000));
+
+    // Aspetto davvero che compaia il contenuto vero (non solo un tempo fisso):
+    // controllo ogni secondo, fino a 25s, se il testo della pagina contiene
+    // "Classifica" seguito da un bel po' di roba (non solo il titolo).
+    let tentativi = 0;
+    while (tentativi < 25){
+      bodyText = await page.evaluate(() => document.body.innerText);
+      if (bodyText.length > 2000 && bodyText.includes('Classifica')) break;
+      await new Promise(res => setTimeout(res, 1000));
+      tentativi++;
+    }
+    console.log(`Aspettati ${tentativi}s per il contenuto vero.`);
+
     html = await page.content();
-    bodyText = await page.evaluate(() => document.body.innerText);
   } finally {
     await browser.close();
   }
