@@ -16,6 +16,7 @@
 
 const admin = require('firebase-admin');
 const cheerio = require('cheerio');
+const puppeteer = require('puppeteer');
 
 const SEASON = '2026/27';
 const URL = 'https://live.centrosportivoitaliano.it/26/Calcio-a-5/Veneto/Verona/C36024/?j=NEU9REdLJjRGPVBOUCY0Rz1HSkRGSCY0SD1GTEZMRUkmNEk9KiogUHVuejJ2MTA1dXYyJjRMPURHSyY0Mj1l';
@@ -32,10 +33,26 @@ async function main(){
   admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
   const db = admin.firestore();
 
-  console.log('Scarico la pagina dal sito CSI...');
-  const resp = await fetch(URL, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; CorbioloC5Bot/1.0)' } });
-  if (!resp.ok) throw new Error(`Il sito ha risposto con errore: ${resp.status}`);
-  const html = await resp.text();
+  console.log('Apro un browser vero (finto) per leggere la pagina...');
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
+  let html;
+  try {
+    const page = await browser.newPage();
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36');
+    await page.setExtraHTTPHeaders({ 'Accept-Language': 'it-IT,it;q=0.9' });
+    await page.goto(URL, { waitUntil: 'networkidle2', timeout: 60000 });
+    // Aspetto che la tabella classifica compaia davvero prima di leggere,
+    // così sono sicura che il contenuto sia stato caricato del tutto.
+    await page.waitForSelector('table', { timeout: 20000 }).catch(() => {
+      console.log('ATTENZIONE: nessuna <table> comparsa entro 20s, leggo comunque quello che c\'è.');
+    });
+    html = await page.content();
+  } finally {
+    await browser.close();
+  }
   console.log(`Pagina scaricata: ${html.length} caratteri.`);
 
   const $ = cheerio.load(html);
