@@ -189,7 +189,12 @@
           selectedGiornata = miglior;
         }
 
-        const matches = rows.filter(m => (+m.giornata||0) === selectedGiornata).sort((a,b)=>(a.data||'').localeCompare(b.data||''));
+        const isCorb = m => (m.casa||'').trim().toLowerCase()===CORB || (m.fuori||'').trim().toLowerCase()===CORB;
+        const matches = rows.filter(m => (+m.giornata||0) === selectedGiornata).sort((a,b)=>{
+          if (isCorb(a) && !isCorb(b)) return -1;
+          if (!isCorb(a) && isCorb(b)) return 1;
+          return (a.data||'').localeCompare(b.data||'');
+        });
 
         content.innerHTML = `
           <div class="giornata-picker">
