@@ -25,7 +25,7 @@
     .cal-grid{gap:4px}
     .cal-cell{border-radius:8px;font-size:clamp(10px,2.8vw,13px)}
     .month-block{margin-bottom:4px}
-    #futureList .future-row{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:center;padding:12px 0;border-bottom:1px solid var(--ring)}
+    #futureList .future-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:center;padding:12px 0;border-bottom:1px solid var(--ring)}
     #futureList .future-row:last-child{border-bottom:0}
     #futureList .tinyLogo{width:34px;height:34px;border-radius:10px;object-fit:contain;flex-shrink:0}
     #futureList .teamName{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
@@ -198,12 +198,11 @@
 
         return `
           <div class="future-row">
-            <span class="pill" style="font-size:18px;padding:8px 10px">${trasfertaIcon}</span>
             ${homeBadge}
             <div class="teamName">${homeName}</div>
             ${awayBadge}
             <div class="teamName">${awayName}</div>
-            <div class="when">${ds}${m.ora ? ' · '+m.ora : ''} · ${m.tipo || 'Campionato'}</div>
+            <div class="when">${trasfertaIcon} ${ds}${m.ora ? ' · '+m.ora : ''} · ${m.tipo || 'Campionato'}</div>
           </div>`;
       }).join('') : '<div class="small">Nessuna partita in questi due mesi</div>';
     }
