@@ -182,27 +182,28 @@
         .filter(m => m.date >= inizio && m.date <= fine)
         .sort((a,b)=> a.date - b.date);
 
+      const tipoIcon = (t) => t==='Coppa' ? '🏅' : t==='Amichevole' ? '🤝' : '🏆';
+
       list.innerHTML = futures.length ? futures.map(m=>{
         const homeSide = isHome(m);
         const homeName = m.casa || 'Corbiolo';
         const awayName = m.fuori || 'Avversario';
-        const homeBadge = homeSide ? `<img src="img/logo_c5.png" style="width:32px;height:32px;border-radius:8px;object-fit:contain" alt="">` : badge(homeName, m.logo_casa, 32);
-        const awayBadge = homeSide ? badge(awayName, m.logo_fuori, 32) : `<img src="img/logo_c5.png" style="width:32px;height:32px;border-radius:8px;object-fit:contain" alt="">`;
-        const icon = homeSide ? '🏠 Casa' : '✈️ Trasferta';
+        const homeBadge = homeSide ? `<img src="img/logo_c5.png" style="width:20px;height:20px;border-radius:5px;object-fit:contain" alt="">` : badge(homeName, m.logo_casa, 20);
+        const awayBadge = homeSide ? badge(awayName, m.logo_fuori, 20) : `<img src="img/logo_c5.png" style="width:20px;height:20px;border-radius:5px;object-fit:contain" alt="">`;
+        const bigIcon = homeSide ? '🏠' : '✈️';
         const ds = fmtListDate(m.date);
-        const tipoTxt = ` · ${m.tipo || 'Campionato'}`;
         return `
-          <div class="future-row">
-            <div class="row" style="justify-content:space-between;align-items:center">
-              <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0">
+          <div class="future-row" style="display:flex;align-items:center;gap:12px">
+            <span class="pill" style="font-size:20px;padding:10px 12px;flex-shrink:0">${bigIcon}</span>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:6px">
                 ${homeBadge}<span style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${homeName}</span>
               </div>
-              <span class="small" style="flex-shrink:0;padding:0 6px">-</span>
-              <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0;justify-content:flex-end;text-align:right">
-                <span style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${awayName}</span>${awayBadge}
+              <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+                ${awayBadge}<span style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${awayName}</span>
               </div>
+              <div class="small" style="margin-top:4px">${tipoIcon(m.tipo)} ${ds}${m.ora ? ' · '+m.ora : ''}</div>
             </div>
-            <div class="small" style="margin-top:4px">${icon} · ${ds}${m.ora ? ' · '+m.ora : ''}${tipoTxt}</div>
           </div>`;
       }).join('') : '<div class="small">Nessuna partita in questi due mesi</div>';
     }
