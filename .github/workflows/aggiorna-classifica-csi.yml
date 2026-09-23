@@ -1,0 +1,28 @@
+name: Aggiorna classifica e risultati dal sito CSI
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: '0 19-23 * * *'   # ogni ora dalle 20:00 alle 24:00 (ora italiana)
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Installa dipendenze
+        working-directory: ./scripts
+        run: npm install
+
+      - name: Aggiorna classifica e risultati
+        working-directory: ./scripts
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: node aggiorna-classifica-csi.js
