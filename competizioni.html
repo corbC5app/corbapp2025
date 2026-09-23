@@ -123,6 +123,14 @@
       });
     });
 
+    function fmtDataLunga(dataStr){
+      if (!dataStr) return '';
+      const d = new Date(dataStr + 'T00:00:00');
+      if (isNaN(+d)) return dataStr;
+      const s = d.toLocaleDateString('it-IT', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+      return s.charAt(0).toUpperCase() + s.slice(1); // "lunedì 5 ottobre 2026" -> "Lunedì 5 ottobre 2026"
+    }
+
     function matchRowHtml(m){
       const isMe = (m.casa||'').trim().toLowerCase()===CORB || (m.fuori||'').trim().toLowerCase()===CORB;
       const casa = m.casa || '?';
@@ -146,7 +154,7 @@
             <div class="g-left">${fuoriBadge}<span>${fuori}</span></div>
             <div class="g-score-single">${scoreFuori}</div>
           </div>
-          ${!scoreMatch ? `<div class="small">${m.data||''}</div>` : ''}
+          ${!scoreMatch ? `<div class="small">${fmtDataLunga(m.data)}</div>` : ''}
         </div>`;
     }
 
