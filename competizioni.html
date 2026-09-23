@@ -28,6 +28,9 @@
     .g-team-line img,.g-team-line .logo{flex-shrink:0}
     .g-score-single{font-weight:900;font-size:15px;flex-shrink:0}
     .fase-block{margin-bottom:16px}
+    .day-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px}
+    .day-popup{background:var(--card);color:var(--text);border-radius:16px;padding:18px;max-width:340px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.35);animation:day-pop .15s ease-out}
+    @keyframes day-pop{ from{ transform:scale(.92); opacity:0 } to{ transform:scale(1); opacity:1 } }
     .fase-title{font-weight:900;font-size:14px;margin-bottom:6px;color:var(--granata);text-transform:uppercase;letter-spacing:.5px}
   </style>
 </head>
@@ -84,6 +87,10 @@
       <div id="content"></div>
       <div id="empty" class="small" style="margin-top:10px"></div>
     </section>
+
+    <div id="matchDetailOverlay" class="day-overlay" style="display:none">
+      <div id="matchDetailCard" class="day-popup"></div>
+    </div>
   </main>
 
   <script type="module">
@@ -144,8 +151,9 @@
       const fuoriBadge = fuori.toLowerCase()===CORB
         ? `<img src="img/logo_c5.png" style="width:22px;height:22px;border-radius:5px;object-fit:contain" alt="">`
         : badge(fuori, m.logo_fuori, 22);
+      const haCronaca = Array.isArray(m.eventi) && m.eventi.length > 0;
       return `
-        <div class="g-match ${isMe?'me':''}">
+        <div class="g-match ${isMe?'me':''}" ${haCronaca ? `data-id="${m.id}" style="cursor:pointer"` : ''}>
           <div class="g-team-line">
             <div class="g-left">${casaBadge}<span>${casa}</span></div>
             <div class="g-score-single">${scoreCasa}</div>
@@ -156,6 +164,63 @@
           </div>
           ${!scoreMatch ? `<div class="small">${fmtDataLunga(m.data)}</div>` : ''}
         </div>`;
+    }
+
+    const matchDetailOverlay = document.getElementById('matchDetailOverlay');
+    const matchDetailCard = document.getElementById('matchDetailCard');
+    matchDetailOverlay.addEventListener('click', (e)=>{ if (e.target === matchDetailOverlay) matchDetailOverlay.style.display='none'; });
+    content.addEventListener('click', (e)=>{
+      const row = e.target.closest('.g-match[data-id]');
+      if (!row) return;
+      const m = all.find(x => x.id === row.dataset.id);
+      if (m) showMatchDetail(m);
+    });
+
+    function showMatchDetail(m){
+      const homeName = (m.casa || 'Corbiolo').trim();
+      const awayName = (m.fuori || 'Avversario').trim();
+      const sc = (m.risultato||'').trim().match(/(\d+)\s*[-–]\s*(\d+)/);
+      const scoreCasa = sc ? sc[1] : '-';
+      const scoreFuori = sc ? sc[2] : '-';
+      const day = fmtDataLunga(m.data);
+      const tipoTag = `<span class="pill" style="margin-left:6px">${m.tipo || 'Campionato'}</span>`;
+      const eventi = Array.isArray(m.eventi) ? m.eventi : [];
+      const homeBadge = homeName.toLowerCase()===CORB
+        ? `<img src="img/logo_c5.png" style="width:44px;height:44px;border-radius:10px;object-fit:contain" alt="">`
+        : badge(homeName, m.logo_casa, 44);
+      const awayBadge = awayName.toLowerCase()===CORB
+        ? `<img src="img/logo_c5.png" style="width:44px;height:44px;border-radius:10px;object-fit:contain" alt="">`
+        : badge(awayName, m.logo_fuori, 44);
+
+      matchDetailCard.innerHTML = `
+        <div class="row" style="justify-content:space-between;align-items:flex-start">
+          <div class="small">${day}${tipoTag}</div>
+          <span style="cursor:pointer;font-size:20px;color:var(--muted)" id="closeMatchDetail">✕</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-top:10px">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:84px">
+            ${homeBadge}<span style="font-size:12px;text-align:center;font-weight:700">${homeName}</span>
+          </div>
+          <div style="font-size:26px;font-weight:900">${scoreCasa} - ${scoreFuori}</div>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:84px">
+            ${awayBadge}<span style="font-size:12px;text-align:center;font-weight:700">${awayName}</span>
+          </div>
+        </div>
+        <div style="margin-top:14px;border-top:1px solid var(--ring);padding-top:8px">
+          <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px">CRONACA</div>
+          <div style="max-height:220px;overflow-y:auto">
+            ${eventi.length
+              ? eventi.map(e=>`<div style="padding:6px 0;border-bottom:1px solid var(--ring);font-size:13px">${e}</div>`).join('')
+              : '<div class="small" style="padding:6px 0">Nessuna cronaca registrata per questa partita.</div>'}
+          </div>
+        </div>
+        ${m.commento ? `
+        <div style="margin-top:12px;border-top:1px solid var(--ring);padding-top:8px">
+          <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px">COMMENTO</div>
+          <div style="font-size:13px;line-height:1.5">${m.commento}</div>
+        </div>` : ''}`;
+      matchDetailOverlay.style.display = 'flex';
+      document.getElementById('closeMatchDetail').onclick = ()=> matchDetailOverlay.style.display='none';
     }
 
     function render(){
