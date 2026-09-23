@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="./style.css?v=35">
   <style>
     .container{gap:8px}
+    body{overflow-x:hidden}
     .month-wrap{margin-bottom:10px;padding:12px}
     .month-head{display:flex;align-items:center;justify-content:space-between}
     .month-name{font-weight:900;line-height:1.05;font-size:clamp(15px,4.5vw,20px)}
@@ -24,10 +25,10 @@
     .cal-grid{gap:4px}
     .cal-cell{border-radius:8px;font-size:clamp(10px,2.8vw,13px)}
     .month-block{margin-bottom:4px}
-    #futureList .future-row{display:grid;grid-template-columns:auto auto 1fr auto 1fr;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid var(--ring)}
+    #futureList .future-row{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:center;padding:12px 0;border-bottom:1px solid var(--ring)}
     #futureList .future-row:last-child{border-bottom:0}
-    #futureList .tinyLogo{width:34px;height:34px;border-radius:10px;object-fit:contain}
-    #futureList .teamName{font-weight:700}
+    #futureList .tinyLogo{width:34px;height:34px;border-radius:10px;object-fit:contain;flex-shrink:0}
+    #futureList .teamName{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
     #futureList .when{grid-column:1/-1;color:var(--muted);font-size:13px;margin-top:6px}
     :root[data-theme="dark"] .arrowbtn{color:#fff}
     .day-overlay{
