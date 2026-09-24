@@ -77,6 +77,17 @@ async function main(){
     }
     console.log(`Aspettati ${tentativi}s per il contenuto vero.`);
 
+    // Faccio una foto di quello che il robot vede davvero in quel momento,
+    // così se la pagina resta bloccata su qualcosa (banner cookie, controllo
+    // "non sei un robot", ecc.) lo vediamo con i nostri occhi invece di
+    // continuare a indovinare alla cieca dai soli log di testo.
+    try {
+      await page.screenshot({ path: 'debug-screenshot.png', fullPage: true });
+      console.log('Screenshot salvato come debug-screenshot.png');
+    } catch (e) {
+      console.log('Non sono riuscita a salvare lo screenshot:', e.message);
+    }
+
     html = await page.content();
   } finally {
     await browser.close();
