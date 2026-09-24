@@ -26,3 +26,11 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: node aggiorna-classifica-csi.js
+
+      - name: Carica screenshot di debug
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-screenshot
+          path: scripts/debug-screenshot.png
+          if-no-files-found: ignore
