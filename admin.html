@@ -169,12 +169,14 @@
         <button class="tab" data-tab="videos">🎥 Video</button>
         <button class="tab" data-tab="standings">🏅 Classifica</button>
         <button class="tab" data-tab="live">🔴 Diretta</button>
+        <button class="tab" data-tab="girone">🌍 Girone</button>
       </div>
 
       <div id="formZone"></div>
       <div id="msgZone"></div>
 
       <div id="liveConsoleZone" style="display:none"></div>
+      <div id="gironeZone" style="display:none"></div>
 
       <div class="card" id="listCard" style="padding:12px">
         <h3 style="margin:0 0 8px 0" id="listTitle">Elenco</h3>
@@ -273,7 +275,7 @@
         fields: [
           {key:'stagione', label:'Stagione', type:'text', placeholder:'2025/26'},
           {key:'giornata', label:'Giornata (solo Campionato)', type:'text', placeholder:'1'},
-          {key:'fase', label:'Fase (solo Coppa)', type:'select', options:['','Sedicesimi','Ottavi','Quarti','Semifinale','Finale']},
+          {key:'fase', label:'Fase (solo Coppa)', type:'datalist', placeholder:'Scrivi liberamente o scegli dai suggerimenti', options:['1° Turno','2° Turno','3° Turno','4° Turno','5° Turno','Sedicesimi','Ottavi','Quarti','Semifinale','Finale']},
           {key:'tipo', label:'Tipo partita', type:'select', options:['Campionato','Amichevole','Coppa']},
           {key:'data', label:'Data', type:'date'},
           {key:'ora', label:'Ora', type:'time'},
@@ -357,6 +359,14 @@
       if (f.type === 'select'){
         const opts = f.options.map(o=>`<option value="${o}" ${o===v?'selected':''}>${o}</option>`).join('');
         return `<label class="field"><span>${f.label}</span><select data-key="${f.key}">${opts}</select></label>`;
+      }
+      if (f.type === 'datalist'){
+        const listId = 'dl-' + f.key;
+        const opts = f.options.map(o=>`<option value="${o}">`).join('');
+        return `<label class="field"><span>${f.label}</span>
+          <input data-key="${f.key}" type="text" list="${listId}" placeholder="${f.placeholder||''}" value="${v}"/>
+          <datalist id="${listId}">${opts}</datalist>
+        </label>`;
       }
       return `<label class="field"><span>${f.label}</span><input data-key="${f.key}" type="${f.type}" placeholder="${f.placeholder||''}" value="${v}"/></label>`;
     }
@@ -491,6 +501,7 @@
         cache[tab] = rows;
         if (currentTab === tab) renderList();
         if (currentTab === 'live' && (tab === 'matches' || tab === 'players')) renderLiveTab();
+        if (currentTab === 'girone' && (tab === 'matches' || tab === 'standings')) renderGironeTab();
       });
     }
 
@@ -500,20 +511,188 @@
       document.querySelectorAll('#tabs .tab').forEach(t=> t.classList.toggle('active', t.dataset.tab===tab));
 
       const isLive = tab === 'live';
-      $('formZone').style.display   = isLive ? 'none' : '';
-      $('listCard').style.display   = isLive ? 'none' : '';
-      $('matchHint').style.display  = isLive ? 'none' : '';
+      const isGirone = tab === 'girone';
+      $('formZone').style.display   = (isLive || isGirone) ? 'none' : '';
+      $('listCard').style.display   = (isLive || isGirone) ? 'none' : '';
+      $('matchHint').style.display  = (isLive || isGirone) ? 'none' : '';
       $('liveConsoleZone').style.display = isLive ? 'block' : 'none';
+      $('gironeZone').style.display = isGirone ? 'block' : 'none';
 
       if (isLive){
         ensureSubscribed('matches');
         ensureSubscribed('players');
         renderLiveTab();
+      } else if (isGirone){
+        ensureSubscribed('matches');
+        ensureSubscribed('standings');
+        renderGironeTab();
       } else {
         renderForm();
         ensureSubscribed(tab);
         renderList();
       }
+    }
+
+    // ===================== TAB GIRONE (classifica + risultati altre squadre, un click) =====================
+    const gironeState = {
+      stagione: null,
+      giornata: null,
+      classificaEdits: {},   // squadra -> {punti,giocate,vinte,pareggiate,perse,gf,gs}
+      risultatiEdits: {},    // matchId -> risultato
+    };
+
+    function renderGironeTab(){
+      const zone = $('gironeZone');
+      const matches = cache.matches || [];
+      const standings = cache.standings || [];
+
+      const stagioni = [...new Set(matches.map(m=>m.stagione).filter(Boolean))].sort((a,b)=> b.localeCompare(a));
+      if (!gironeState.stagione) gironeState.stagione = stagioni[0] || currentSeason();
+      if (!stagioni.includes(gironeState.stagione)) stagioni.unshift(gironeState.stagione);
+
+      const matchesStagione = matches.filter(m => m.stagione === gironeState.stagione && (m.tipo||'Campionato')==='Campionato');
+      const squadre = [...new Set(matchesStagione.flatMap(m => [m.casa, m.fuori]))].filter(Boolean).sort();
+
+      const giornateDisponibili = [...new Set(matchesStagione.map(m=>+m.giornata||0))].filter(g=>g>0).sort((a,b)=>a-b);
+      if (!gironeState.giornata || !giornateDisponibili.includes(gironeState.giornata)) gironeState.giornata = giornateDisponibili[0] || 1;
+
+      const matchesGiornata = matchesStagione.filter(m => (+m.giornata||0) === gironeState.giornata);
+
+      function standingFor(squadra){
+        const s = standings.find(x => (x.squadra||'').trim().toLowerCase() === squadra.trim().toLowerCase() && x.stagione === gironeState.stagione);
+        const edit = gironeState.classificaEdits[squadra] || {};
+        return {
+          punti: edit.punti ?? s?.punti ?? 0,
+          giocate: edit.giocate ?? s?.giocate ?? 0,
+          vinte: edit.vinte ?? s?.vinte ?? 0,
+          pareggiate: edit.pareggiate ?? s?.pareggiate ?? 0,
+          perse: edit.perse ?? s?.perse ?? 0,
+          gf: edit.gf ?? s?.gf ?? 0,
+          gs: edit.gs ?? s?.gs ?? 0,
+        };
+      }
+
+      const campiClassifica = ['punti','giocate','vinte','pareggiate','perse','gf','gs'];
+      const etichette = {punti:'Pt', giocate:'PG', vinte:'V', pareggiate:'N', perse:'P', gf:'GF', gs:'GS'};
+
+      zone.innerHTML = `
+        <div class="hint">
+          💡 Da qui aggiorni classifica e risultati delle altre squadre in un colpo solo — mandami i numeri
+          (anche solo una foto del sito), li scrivi qui, e un solo tocco su "Salva tutto" li manda in Firestore.
+          Non tocca mai le vostre partite (quelle restano governate dalla Diretta).
+        </div>
+
+        <div class="row" style="margin-top:10px;gap:8px;align-items:center">
+          <label class="small" style="font-weight:700">Stagione</label>
+          <select id="gironeStagioneSel" style="border:1px solid var(--ring);border-radius:10px;padding:6px 10px;background:var(--card);color:var(--text)">
+            ${stagioni.map(s=>`<option value="${s}" ${s===gironeState.stagione?'selected':''}>${s}</option>`).join('')}
+          </select>
+        </div>
+
+        <h3 style="margin:18px 0 8px 0">🏅 Classifica</h3>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <thead>
+              <tr style="text-align:left;color:var(--muted)">
+                <th style="padding:4px">Squadra</th>
+                ${campiClassifica.map(c=>`<th style="padding:4px;text-align:center">${etichette[c]}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${squadre.map(sq=>{
+                const v = standingFor(sq);
+                const isMe = sq.trim().toLowerCase()==='corbiolo';
+                return `<tr style="${isMe?'font-weight:800':''}">
+                  <td style="padding:4px;white-space:nowrap">${sq}</td>
+                  ${campiClassifica.map(c=>`<td style="padding:2px"><input type="number" data-squadra="${sq}" data-campo="${c}" value="${v[c]}" style="width:44px;border:1px solid var(--ring);border-radius:6px;padding:3px;background:var(--card);color:var(--text);text-align:center"></td>`).join('')}
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <h3 style="margin:20px 0 8px 0">🏆 Risultati — Giornata</h3>
+        <div class="row" style="gap:8px;align-items:center;justify-content:center">
+          <button id="gironeGPrev" class="btn btn-ghost">←</button>
+          <div style="font-weight:800">Giornata ${gironeState.giornata}</div>
+          <button id="gironeGNext" class="btn btn-ghost">→</button>
+        </div>
+        <div style="margin-top:10px">
+          ${matchesGiornata.map(m=>{
+            const val = gironeState.risultatiEdits[m.id] ?? (m.risultato || '');
+            const isMe = (m.casa||'').trim().toLowerCase()==='corbiolo' || (m.fuori||'').trim().toLowerCase()==='corbiolo';
+            return `
+              <div class="row" style="justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--ring);${isMe?'font-weight:800':''}">
+                <div class="small" style="flex:1">${m.casa||'?'} - ${m.fuori||'?'}</div>
+                <input type="text" data-match-id="${m.id}" placeholder="es. 3-2" value="${val}" style="width:70px;border:1px solid var(--ring);border-radius:6px;padding:4px 6px;background:var(--card);color:var(--text);text-align:center">
+              </div>`;
+          }).join('') || '<div class="small">Nessuna partita in questa giornata.</div>'}
+        </div>
+
+        <button id="gironeSaveBtn" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:18px">💾 Salva tutto</button>
+        <div class="small" id="gironeMsg" style="margin-top:6px;min-height:16px"></div>
+      `;
+
+      $('gironeStagioneSel').onchange = (e)=>{
+        gironeState.stagione = e.target.value;
+        gironeState.giornata = null;
+        gironeState.classificaEdits = {};
+        gironeState.risultatiEdits = {};
+        renderGironeTab();
+      };
+      $('gironeGPrev').onclick = ()=>{
+        const idx = giornateDisponibili.indexOf(gironeState.giornata);
+        if (idx>0){ gironeState.giornata = giornateDisponibili[idx-1]; renderGironeTab(); }
+      };
+      $('gironeGNext').onclick = ()=>{
+        const idx = giornateDisponibili.indexOf(gironeState.giornata);
+        if (idx<giornateDisponibili.length-1){ gironeState.giornata = giornateDisponibili[idx+1]; renderGironeTab(); }
+      };
+
+      zone.querySelectorAll('input[data-squadra]').forEach(inp=>{
+        inp.oninput = ()=>{
+          const sq = inp.dataset.squadra, campo = inp.dataset.campo;
+          gironeState.classificaEdits[sq] = gironeState.classificaEdits[sq] || {};
+          gironeState.classificaEdits[sq][campo] = inp.value;
+        };
+      });
+      zone.querySelectorAll('input[data-match-id]').forEach(inp=>{
+        inp.oninput = ()=>{ gironeState.risultatiEdits[inp.dataset.matchId] = inp.value; };
+      });
+
+      $('gironeSaveBtn').onclick = async ()=>{
+        const btn = $('gironeSaveBtn');
+        const msg = $('gironeMsg');
+        btn.disabled = true;
+        msg.textContent = 'Salvataggio in corso...';
+        try{
+          // --- Classifica: creo o aggiorno una riga per ogni squadra modificata ---
+          for (const sq of Object.keys(gironeState.classificaEdits)){
+            const edit = gironeState.classificaEdits[sq];
+            const existing = standings.find(x => (x.squadra||'').trim().toLowerCase() === sq.trim().toLowerCase() && x.stagione === gironeState.stagione);
+            const dati = {
+              squadra: sq, stagione: gironeState.stagione,
+              punti: +edit.punti || 0, giocate: +edit.giocate || 0, vinte: +edit.vinte || 0,
+              pareggiate: +edit.pareggiate || 0, perse: +edit.perse || 0,
+              gf: +edit.gf || 0, gs: +edit.gs || 0,
+            };
+            if (existing) await Standings.update(existing.id, dati);
+            else await Standings.add(dati);
+          }
+          // --- Risultati: aggiorno solo le partite modificate ---
+          for (const matchId of Object.keys(gironeState.risultatiEdits)){
+            const nuovoRisultato = gironeState.risultatiEdits[matchId].trim();
+            await Matches.update(matchId, { risultato: nuovoRisultato });
+          }
+          gironeState.classificaEdits = {};
+          gironeState.risultatiEdits = {};
+          msg.textContent = '✅ Salvato tutto correttamente.';
+        }catch(err){
+          msg.textContent = '❌ Errore: ' + err.message;
+        }finally{
+          btn.disabled = false;
+        }
+      };
     }
 
     // ===================== CONSOLE DIRETTA =====================
