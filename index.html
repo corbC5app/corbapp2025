@@ -235,18 +235,29 @@
       const homeBadge = homeName.toLowerCase()===CORB ? `<img src="img/logo_c5.png" style="width:40px;height:40px;border-radius:9px;background:#fff" alt="">` : badge(homeName, nextMatch.logo_casa, 40);
       const awayBadge = awayName.toLowerCase()===CORB ? `<img src="img/logo_c5.png" style="width:40px;height:40px;border-radius:9px;background:#fff" alt="">` : badge(awayName, nextMatch.logo_fuori, 40);
 
+      const tipo = nextMatch.tipo || 'Campionato';
+      const giornataTxt = tipo === 'Coppa' ? (nextMatch.fase || '') : (tipo === 'Campionato' && nextMatch.giornata ? `${nextMatch.giornata}ª giornata` : '');
+      const indirizzo = tipo === 'Coppa' ? 'C.S. Avanzi - Via Flavio Gioia - Vr'
+        : (tipo === 'Campionato' && homeName.toLowerCase()===CORB) ? 'Palazzetto di Bosco Chiesanuova'
+        : (nextMatch.indirizzo || '');
+
       countdownBox.innerHTML = `
         <div style="display:flex;align-items:center;justify-content:center;gap:18px">
           <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:80px">
             ${homeBadge}
             <span style="font-size:11px;text-align:center">${homeName}</span>
           </div>
-          <span style="font-size:12px;opacity:.75">vs</span>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+            ${giornataTxt ? `<span style="font-size:9px;opacity:.7">${giornataTxt}</span>` : ''}
+            <span style="font-size:12px;opacity:.75">vs</span>
+            <span style="font-size:9px;opacity:.7">${tipo}</span>
+          </div>
           <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:80px">
             ${awayBadge}
             <span style="font-size:11px;text-align:center">${awayName}</span>
           </div>
         </div>
+        ${indirizzo ? `<div style="font-size:10px;opacity:.7;margin-top:6px">${indirizzo}</div>` : ''}
         <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:14px">
           <div style="background:#fff;color:var(--granata);border-radius:10px;padding:8px 12px;min-width:48px;text-align:center">
             <div style="font-size:24px;font-weight:900;line-height:1">${pad(days)}</div>

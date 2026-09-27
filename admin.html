@@ -287,6 +287,7 @@
           {key:'stato', label:'Stato partita', type:'select', options:['Regolare','Rinviata','Annullata']},
           {key:'speciale', label:'Partita speciale (derby/big match)', type:'select', options:['No','Sì']},
           {key:'commento', label:'Commento partita (facoltativo, visibile ai tifosi)', type:'textarea'},
+          {key:'indirizzo', label:'Indirizzo campo (serve solo per le trasferte e le amichevoli — Coppa e partite in casa di Campionato sono automatiche)', type:'text', placeholder:'es. Via Roma - San Martino Buon Albergo'},
           {key:'live', label:'In diretta ORA?', type:'select', options:['No','Sì']},
         ],
         itemLabel: (m)=> `${m.data||'?'} ${m.ora||''} — ${m.casa||'Corbiolo'} vs ${m.fuori||'Avversario'} ${m.risultato ? '('+m.risultato+')' : ''} ${m.stagione ? '· '+m.stagione : ''} ${m.stato && m.stato!=='Regolare' ? '⚠️ '+m.stato : ''}`,
