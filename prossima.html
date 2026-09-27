@@ -174,10 +174,14 @@
           </div>`;
 
         const isHomeCorb = homeName.toLowerCase()===CORB;
+        const isCoppa = next.tipo === 'Coppa';
+        const indirizzoCoppa = 'C.S. Avanzi - Via Flavio Gioia - Vr';
         nextMeta.innerHTML = `
-          <span class="pill-soft">${isHomeCorb?'🏠 Casa':'✈️ Trasferta'}</span>
-          <span class="pill-soft">${fmtLong(next.date)}</span>
-          ${next.tipo && next.tipo!=='Campionato' ? `<span class="pill-soft">${next.tipo}</span>` : ''}
+          <span class="pill-soft">${isCoppa ? '🏆 '+indirizzoCoppa : (isHomeCorb?'🏠 Casa':'✈️ Trasferta')}</span>
+          ${isCoppa
+            ? `<span class="pill-soft">Coppa</span><span class="pill-soft">${fmtLong(next.date)}</span>`
+            : `<span class="pill-soft">${fmtLong(next.date)}</span>${next.tipo && next.tipo!=='Campionato' ? `<span class="pill-soft">${next.tipo}</span>` : ''}`
+          }
           ${next.speciale==='Sì' ? `<span class="pill-soft" style="background:#facc15;color:#3a2f00;font-weight:800">🔥 DA NON PERDERE</span>` : ''}
         `;
 
