@@ -39,6 +39,13 @@
     /* ---- Console Diretta: tutto compatto, pensato per stare in un solo schermo ---- */
     .live-wrap{display:grid;gap:8px;max-width:480px;margin:0 auto}
     .live-select{border:1px solid var(--ring);border-radius:10px;padding:8px 10px;background:var(--card);color:var(--text);font:inherit;width:100%}
+    .live-group{border:1px solid var(--ring);border-radius:10px;margin-bottom:6px;overflow:hidden}
+    .live-group-header{width:100%;display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--card);color:var(--text);border:none;font-weight:700;font-size:13px;cursor:pointer}
+    .live-group-list{border-top:1px solid var(--ring)}
+    .live-match-row{padding:9px 12px;font-size:12.5px;cursor:pointer;border-bottom:1px solid var(--ring)}
+    .live-match-row:last-child{border-bottom:none}
+    .live-match-row:hover{background:var(--ring)}
+    .live-match-row.active{background:#e0261f;color:#fff;font-weight:700}
     .live-toggle{
       width:100%;padding:14px;border-radius:14px;border:2px solid var(--ring);background:var(--card);color:var(--text);
       font-weight:800;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;
@@ -702,6 +709,7 @@
       period: '1T',      // '1T' | '2T' | 'REC' — solo per l'etichetta mostrata
       team: 'casa',       // 'casa' | 'fuori'
       eventType: 'gol',   // 'gol' | 'giallo' | 'rosso'
+      openGroups: {},     // quali gruppi (Coppa/Campionato per stagione) sono aperti nell'elenco partite
     };
     let clockTickTimer = null;
 
@@ -925,7 +933,31 @@
       }
       const match = matches.find(m => m.id === liveState.matchId);
 
-      const options = matches.map(m => `<option value="${m.id}" ${m.id===liveState.matchId?'selected':''}>${m.data||'?'} — ${m.casa||'Corbiolo'} vs ${m.fuori||'Avversario'}</option>`).join('');
+      // Raggruppo le partite per Coppa (tutte insieme) o Campionato/Amichevole per
+      // stagione, così l'elenco resta ordinato anche con più stagioni insieme —
+      // ogni gruppo parte chiuso, lo apri tu solo quando ti serve scegliere lì dentro.
+      const gruppi = {};
+      const ordineGruppi = [];
+      matches.forEach(m=>{
+        const chiave = (m.tipo||'Campionato')==='Coppa' ? 'Coppa' : `${m.tipo||'Campionato'} ${m.stagione||''}`.trim();
+        if (!gruppi[chiave]){ gruppi[chiave] = []; ordineGruppi.push(chiave); }
+        gruppi[chiave].push(m);
+      });
+
+      const gruppiHtml = ordineGruppi.map(chiave=>{
+        const isOpen = !!liveState.openGroups[chiave];
+        const righe = gruppi[chiave].map(m => `
+          <div class="live-match-row ${m.id===liveState.matchId?'active':''}" data-match-id="${m.id}">
+            ${m.data||'?'} — ${m.casa||'Corbiolo'} vs ${m.fuori||'Avversario'}
+          </div>`).join('');
+        return `
+          <div class="live-group">
+            <button class="live-group-header" data-group="${chiave}">
+              <span>${chiave} (${gruppi[chiave].length})</span><span>${isOpen?'▲':'▼'}</span>
+            </button>
+            ${isOpen ? `<div class="live-group-list">${righe}</div>` : ''}
+          </div>`;
+      }).join('');
 
       if (clockTickTimer){ clearInterval(clockTickTimer); clockTickTimer = null; }
 
@@ -952,7 +984,7 @@
 
       zone.innerHTML = `
         <div class="live-wrap">
-          <select class="live-select" id="liveMatchSelect">${options}</select>
+          <div id="liveGroupsZone">${gruppiHtml}</div>
 
           <button id="liveToggleBtn" class="live-toggle ${isLive ? 'on' : ''}">
             ${isLive ? '🔴 DIRETTA ATTIVA — tocca per fermare' : '⚪ Diretta ferma — tocca per iniziare'}
@@ -1013,7 +1045,22 @@
           ` : ''}
         </div>`;
 
-      $('liveMatchSelect').onchange = (e)=>{ liveState.matchId = e.target.value; liveState.team = corbSide; renderLiveTab(); };
+      zone.querySelectorAll('.live-group-header').forEach(b=>{
+        b.onclick = ()=>{
+          const k = b.dataset.group;
+          liveState.openGroups[k] = !liveState.openGroups[k];
+          renderLiveTab();
+        };
+      });
+      zone.querySelectorAll('.live-match-row').forEach(r=>{
+        r.onclick = ()=>{
+          const sel = matches.find(m => m.id === r.dataset.matchId);
+          if (!sel) return;
+          liveState.matchId = sel.id;
+          liveState.team = (sel.casa||'').trim().toLowerCase()==='corbiolo' ? 'casa' : 'fuori';
+          renderLiveTab();
+        };
+      });
       $('liveToggleBtn').onclick = ()=> toggleLive(match);
       $('openFullCronacaBtn').onclick = ()=> { ensureSubscribed('players'); openCronacaEditor(match); };
       wireProvaSection(zone);
