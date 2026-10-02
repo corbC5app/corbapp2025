@@ -356,6 +356,7 @@
 
     let currentTab = 'matches';
     let editingId = null; // se valorizzato, il form sta modificando invece di creare
+    let listOpenGroups = {}; // quali gruppi (Coppa/Campionato per stagione) sono aperti nell'Elenco partite
     const unsub = {}; // funzioni di unsubscribe per ogni entità già collegata
     const cache = {}; // ultimi dati ricevuti per ogni entità
 
@@ -455,7 +456,8 @@
       $('listTitle').textContent = 'Elenco ' + ent.label.toLowerCase();
       const rows = [...(cache[currentTab]||[])];
       if (ent.sort) rows.sort(ent.sort);
-      $('listZone').innerHTML = rows.length ? rows.map((r,i) => `
+
+      const rowHtml = (r,i) => `
         <div class="item-row">
           <div>${ent.itemLabel(r)}</div>
           <div class="item-actions">
@@ -467,7 +469,39 @@
             <button data-act="del" data-id="${r.id}">🗑️ Elimina</button>
             ${currentTab==='matches' ? `<button data-act="cronaca" data-id="${r.id}">📓 Cronaca</button>` : ''}
           </div>
-        </div>`).join('') : '<div class="small">Nessun elemento ancora.</div>';
+        </div>`;
+
+      if (currentTab === 'matches' && rows.length){
+        // Raggruppo per Coppa (tutte insieme) o Campionato/Amichevole per
+        // stagione, chiuso di default: apri solo il gruppo che ti serve.
+        const gruppi = {};
+        const ordineGruppi = [];
+        rows.forEach(r=>{
+          const chiave = (r.tipo||'Campionato')==='Coppa' ? 'Coppa' : `${r.tipo||'Campionato'} ${r.stagione||''}`.trim();
+          if (!gruppi[chiave]){ gruppi[chiave] = []; ordineGruppi.push(chiave); }
+          gruppi[chiave].push(r);
+        });
+        $('listZone').innerHTML = ordineGruppi.map(chiave=>{
+          const isOpen = !!listOpenGroups[chiave];
+          const righeGruppo = gruppi[chiave].map((r)=> rowHtml(r, rows.indexOf(r))).join('');
+          return `
+            <div class="live-group">
+              <button class="live-group-header" data-listgroup="${chiave}">
+                <span>${chiave} (${gruppi[chiave].length})</span><span>${isOpen?'▲':'▼'}</span>
+              </button>
+              ${isOpen ? righeGruppo : ''}
+            </div>`;
+        }).join('');
+        $('listZone').querySelectorAll('[data-listgroup]').forEach(b=>{
+          b.onclick = ()=>{
+            const k = b.dataset.listgroup;
+            listOpenGroups[k] = !listOpenGroups[k];
+            renderList();
+          };
+        });
+      } else {
+        $('listZone').innerHTML = rows.length ? rows.map(rowHtml).join('') : '<div class="small">Nessun elemento ancora.</div>';
+      }
 
       $('listZone').querySelectorAll('[data-act="up"]').forEach(btn=>{
         btn.onclick = ()=> moveVideo(rows, btn.dataset.id, -1);
