@@ -1,5 +1,5 @@
 // sw.js — cache offline (PWA) + notifiche push in background (Firebase Cloud Messaging)
-const CACHE = "corb-cache-v71";
+const CACHE = "corb-cache-v72";
 
 const ASSETS = [
   "./",
@@ -102,8 +102,8 @@ messaging.onBackgroundMessage((payload) => {
 // locale, giusto per verificare che permesso + service worker funzionino.
 self.addEventListener('message', (event) => {
   if (event?.data?.type === 'local-test-notify'){
-    self.registration.showNotification('CORB • Test', {
-      body: 'Questa è una notifica di prova.',
+    self.registration.showNotification(event.data.title || 'CORB • Test', {
+      body: event.data.body || 'Questa è una notifica di prova.',
       icon: './img/logo_c5.png',
       data: { url: './index.html' }
     });
