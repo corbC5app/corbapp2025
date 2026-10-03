@@ -575,53 +575,78 @@
       }
     }
 
-    // ===================== TAB GIRONE (classifica + risultati altre squadre, un click) =====================
+    // ===================== TAB GIRONE (risultati altre squadre → classifica calcolata da sola) =====================
     const gironeState = {
       stagione: null,
       giornata: null,
-      classificaEdits: {},   // squadra -> {punti,giocate,vinte,pareggiate,perse,gf,gs}
-      risultatiEdits: {},    // matchId -> risultato
+      risultatiEdits: {},    // matchId -> risultato (non ancora salvato)
     };
+
+    // Calcola Pt/PG/V/N/P/GF/GS per ogni squadra leggendo i risultati delle
+    // partite di quella stagione — compresi quelli scritti ma non ancora
+    // salvati (risultatiEdits), così la classifica si aggiorna all'istante
+    // mentre scrivi, prima ancora di toccare "Salva tutto".
+    function calcolaClassifica(matchesStagione, risultatiEdits){
+      const tab = {};
+      function riga(sq){
+        if (!tab[sq]) tab[sq] = {squadra:sq, punti:0, giocate:0, vinte:0, pareggiate:0, perse:0, gf:0, gs:0};
+        return tab[sq];
+      }
+      matchesStagione.forEach(m=>{
+        if (!m.casa || !m.fuori) return;
+        riga(m.casa); riga(m.fuori); // così compaiono anche a 0 partite giocate
+        const raw = (risultatiEdits[m.id] ?? m.risultato ?? '').trim();
+        const mm = raw.match(/^(\d+)\s*[-–]\s*(\d+)$/);
+        if (!mm) return;
+        const gc = +mm[1], gf = +mm[2];
+        const rCasa = riga(m.casa), rFuori = riga(m.fuori);
+        rCasa.giocate++; rFuori.giocate++;
+        rCasa.gf += gc; rCasa.gs += gf;
+        rFuori.gf += gf; rFuori.gs += gc;
+        if (gc > gf){ rCasa.vinte++; rCasa.punti+=3; rFuori.perse++; }
+        else if (gc < gf){ rFuori.vinte++; rFuori.punti+=3; rCasa.perse++; }
+        else { rCasa.pareggiate++; rFuori.pareggiate++; rCasa.punti++; rFuori.punti++; }
+      });
+      return Object.values(tab).sort((a,b)=> b.punti-a.punti || (b.gf-b.gs)-(a.gf-a.gs) || b.gf-a.gf);
+    }
+
+    function classificaRowsHtml(righe){
+      return righe.map(r=>{
+        const isMe = r.squadra.trim().toLowerCase()==='corbiolo';
+        return `<tr style="${isMe?'font-weight:800':''}">
+          <td style="padding:4px;white-space:nowrap">${r.squadra}</td>
+          <td style="padding:4px;text-align:center;font-weight:800">${r.punti}</td>
+          <td style="padding:4px;text-align:center">${r.giocate}</td>
+          <td style="padding:4px;text-align:center">${r.vinte}</td>
+          <td style="padding:4px;text-align:center">${r.pareggiate}</td>
+          <td style="padding:4px;text-align:center">${r.perse}</td>
+          <td style="padding:4px;text-align:center">${r.gf}</td>
+          <td style="padding:4px;text-align:center">${r.gs}</td>
+        </tr>`;
+      }).join('');
+    }
 
     function renderGironeTab(){
       const zone = $('gironeZone');
       const matches = cache.matches || [];
-      const standings = cache.standings || [];
 
       const stagioni = [...new Set(matches.map(m=>m.stagione).filter(Boolean))].sort((a,b)=> b.localeCompare(a));
       if (!gironeState.stagione) gironeState.stagione = stagioni[0] || currentSeason();
       if (!stagioni.includes(gironeState.stagione)) stagioni.unshift(gironeState.stagione);
 
       const matchesStagione = matches.filter(m => m.stagione === gironeState.stagione && (m.tipo||'Campionato')==='Campionato');
-      const squadre = [...new Set(matchesStagione.flatMap(m => [m.casa, m.fuori]))].filter(Boolean).sort();
 
       const giornateDisponibili = [...new Set(matchesStagione.map(m=>+m.giornata||0))].filter(g=>g>0).sort((a,b)=>a-b);
       if (!gironeState.giornata || !giornateDisponibili.includes(gironeState.giornata)) gironeState.giornata = giornateDisponibili[0] || 1;
 
       const matchesGiornata = matchesStagione.filter(m => (+m.giornata||0) === gironeState.giornata);
-
-      function standingFor(squadra){
-        const s = standings.find(x => (x.squadra||'').trim().toLowerCase() === squadra.trim().toLowerCase() && x.stagione === gironeState.stagione);
-        const edit = gironeState.classificaEdits[squadra] || {};
-        return {
-          punti: edit.punti ?? s?.punti ?? 0,
-          giocate: edit.giocate ?? s?.giocate ?? 0,
-          vinte: edit.vinte ?? s?.vinte ?? 0,
-          pareggiate: edit.pareggiate ?? s?.pareggiate ?? 0,
-          perse: edit.perse ?? s?.perse ?? 0,
-          gf: edit.gf ?? s?.gf ?? 0,
-          gs: edit.gs ?? s?.gs ?? 0,
-        };
-      }
-
-      const campiClassifica = ['punti','giocate','vinte','pareggiate','perse','gf','gs'];
-      const etichette = {punti:'Pt', giocate:'PG', vinte:'V', pareggiate:'N', perse:'P', gf:'GF', gs:'GS'};
+      const classificaCalcolata = calcolaClassifica(matchesStagione, gironeState.risultatiEdits);
 
       zone.innerHTML = `
         <div class="hint">
-          💡 Da qui aggiorni classifica e risultati delle altre squadre in un colpo solo — mandami i numeri
-          (anche solo una foto del sito), li scrivi qui, e un solo tocco su "Salva tutto" li manda in Firestore.
-          Non tocca mai le vostre partite (quelle restano governate dalla Diretta).
+          💡 Scrivi qui i risultati delle altre squadre (mandami una foto del sito se ti serve) — la classifica
+          sotto si aggiorna da sola mentre scrivi, nessun numero da calcolare a mano. Un tocco su "Salva tutto"
+          manda tutto in Firestore. Non tocca mai le vostre partite (quelle restano governate dalla Diretta).
         </div>
 
         <div class="row" style="margin-top:10px;gap:8px;align-items:center">
@@ -629,28 +654,6 @@
           <select id="gironeStagioneSel" style="border:1px solid var(--ring);border-radius:10px;padding:6px 10px;background:var(--card);color:var(--text)">
             ${stagioni.map(s=>`<option value="${s}" ${s===gironeState.stagione?'selected':''}>${s}</option>`).join('')}
           </select>
-        </div>
-
-        <h3 style="margin:18px 0 8px 0">🏅 Classifica</h3>
-        <div style="overflow-x:auto">
-          <table style="width:100%;border-collapse:collapse;font-size:12px">
-            <thead>
-              <tr style="text-align:left;color:var(--muted)">
-                <th style="padding:4px">Squadra</th>
-                ${campiClassifica.map(c=>`<th style="padding:4px;text-align:center">${etichette[c]}</th>`).join('')}
-              </tr>
-            </thead>
-            <tbody>
-              ${squadre.map(sq=>{
-                const v = standingFor(sq);
-                const isMe = sq.trim().toLowerCase()==='corbiolo';
-                return `<tr style="${isMe?'font-weight:800':''}">
-                  <td style="padding:4px;white-space:nowrap">${sq}</td>
-                  ${campiClassifica.map(c=>`<td style="padding:2px"><input type="number" data-squadra="${sq}" data-campo="${c}" value="${v[c]}" style="width:44px;border:1px solid var(--ring);border-radius:6px;padding:3px;background:var(--card);color:var(--text);text-align:center"></td>`).join('')}
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
         </div>
 
         <h3 style="margin:20px 0 8px 0">🏆 Risultati — Giornata</h3>
@@ -673,12 +676,30 @@
 
         <button id="gironeSaveBtn" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:18px">💾 Salva tutto</button>
         <div class="small" id="gironeMsg" style="margin-top:6px;min-height:16px"></div>
+
+        <h3 style="margin:22px 0 8px 0">🏅 Classifica <span class="small" style="font-weight:400">(calcolata da sola dai risultati)</span></h3>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:11.5px">
+            <thead>
+              <tr style="text-align:left;color:var(--muted)">
+                <th style="padding:4px">Squadra</th>
+                <th style="padding:4px;text-align:center">Pt</th>
+                <th style="padding:4px;text-align:center">PG</th>
+                <th style="padding:4px;text-align:center">V</th>
+                <th style="padding:4px;text-align:center">N</th>
+                <th style="padding:4px;text-align:center">P</th>
+                <th style="padding:4px;text-align:center">GF</th>
+                <th style="padding:4px;text-align:center">GS</th>
+              </tr>
+            </thead>
+            <tbody id="classificaCalcBody">${classificaRowsHtml(classificaCalcolata)}</tbody>
+          </table>
+        </div>
       `;
 
       $('gironeStagioneSel').onchange = (e)=>{
         gironeState.stagione = e.target.value;
         gironeState.giornata = null;
-        gironeState.classificaEdits = {};
         gironeState.risultatiEdits = {};
         renderGironeTab();
       };
@@ -691,15 +712,14 @@
         if (idx<giornateDisponibili.length-1){ gironeState.giornata = giornateDisponibili[idx+1]; renderGironeTab(); }
       };
 
-      zone.querySelectorAll('input[data-squadra]').forEach(inp=>{
-        inp.oninput = ()=>{
-          const sq = inp.dataset.squadra, campo = inp.dataset.campo;
-          gironeState.classificaEdits[sq] = gironeState.classificaEdits[sq] || {};
-          gironeState.classificaEdits[sq][campo] = inp.value;
-        };
-      });
+      // Appena scrivi un risultato, ricalcolo SOLO la tabella della classifica
+      // (non tutta la schermata) così non perdi il punto dove stavi scrivendo.
       zone.querySelectorAll('input[data-match-id]').forEach(inp=>{
-        inp.oninput = ()=>{ gironeState.risultatiEdits[inp.dataset.matchId] = inp.value; };
+        inp.oninput = ()=>{
+          gironeState.risultatiEdits[inp.dataset.matchId] = inp.value;
+          const nuova = calcolaClassifica(matchesStagione, gironeState.risultatiEdits);
+          $('classificaCalcBody').innerHTML = classificaRowsHtml(nuova);
+        };
       });
 
       $('gironeSaveBtn').onclick = async ()=>{
@@ -708,25 +728,22 @@
         btn.disabled = true;
         msg.textContent = 'Salvataggio in corso...';
         try{
-          // --- Classifica: creo o aggiorno una riga per ogni squadra modificata ---
-          for (const sq of Object.keys(gironeState.classificaEdits)){
-            const edit = gironeState.classificaEdits[sq];
-            const existing = standings.find(x => (x.squadra||'').trim().toLowerCase() === sq.trim().toLowerCase() && x.stagione === gironeState.stagione);
-            const dati = {
-              squadra: sq, stagione: gironeState.stagione,
-              punti: +edit.punti || 0, giocate: +edit.giocate || 0, vinte: +edit.vinte || 0,
-              pareggiate: +edit.pareggiate || 0, perse: +edit.perse || 0,
-              gf: +edit.gf || 0, gs: +edit.gs || 0,
-            };
-            if (existing) await Standings.update(existing.id, dati);
-            else await Standings.add(dati);
-          }
           // --- Risultati: aggiorno solo le partite modificate ---
           for (const matchId of Object.keys(gironeState.risultatiEdits)){
             const nuovoRisultato = gironeState.risultatiEdits[matchId].trim();
             await Matches.update(matchId, { risultato: nuovoRisultato });
           }
-          gironeState.classificaEdits = {};
+          // --- Classifica: ricalcolo con i dati appena salvati e scrivo ogni squadra ---
+          const matchesAggiornate = matchesStagione.map(m => gironeState.risultatiEdits[m.id] !== undefined
+            ? { ...m, risultato: gironeState.risultatiEdits[m.id].trim() } : m);
+          const classificaFinale = calcolaClassifica(matchesAggiornate, {});
+          const standingsAttuali = cache.standings || [];
+          for (const r of classificaFinale){
+            const existing = standingsAttuali.find(x => (x.squadra||'').trim().toLowerCase() === r.squadra.trim().toLowerCase() && x.stagione === gironeState.stagione);
+            const dati = { ...r, stagione: gironeState.stagione };
+            if (existing) await Standings.update(existing.id, dati);
+            else await Standings.add(dati);
+          }
           gironeState.risultatiEdits = {};
           msg.textContent = '✅ Salvato tutto correttamente.';
         }catch(err){
