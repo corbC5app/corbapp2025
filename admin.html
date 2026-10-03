@@ -169,14 +169,15 @@
         <button id="logoutBtn" class="btn btn-ghost">Esci</button>
       </div>
 
-      <div class="tabs" id="tabs">
-        <button class="tab active" data-tab="matches">🏆 Partite</button>
-        <button class="tab" data-tab="news">📰 News</button>
-        <button class="tab" data-tab="players">👥 Giocatori</button>
-        <button class="tab" data-tab="videos">🎥 Video</button>
-        <button class="tab" data-tab="standings">🏅 Classifica</button>
-        <button class="tab" data-tab="live">🔴 Diretta</button>
-        <button class="tab" data-tab="girone">🌍 Girone</button>
+      <div class="tabs" id="tabs" style="flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch">
+        <button class="tab active" data-tab="live" style="flex-shrink:0">🔴 Diretta</button>
+        <button class="tab" data-tab="girone" style="flex-shrink:0">🌍 Girone</button>
+        <button class="tab" data-tab="matches" style="flex-shrink:0">🏆 Partite</button>
+        <button class="tab" data-tab="news" style="flex-shrink:0">📰 News</button>
+        <button class="tab" data-tab="players" style="flex-shrink:0">👥 Giocatori</button>
+        <button class="tab" data-tab="videos" style="flex-shrink:0">🎥 Video</button>
+        <button class="tab" data-tab="standings" style="flex-shrink:0">🏅 Classifica</button>
+        <button class="tab" data-tab="settings" style="flex-shrink:0">⚙️ Impostazioni</button>
       </div>
 
       <div id="formZone"></div>
@@ -184,6 +185,7 @@
 
       <div id="liveConsoleZone" style="display:none"></div>
       <div id="gironeZone" style="display:none"></div>
+      <div id="settingsZone" style="display:none"></div>
 
       <div class="card" id="listCard" style="padding:12px">
         <h3 style="margin:0 0 8px 0" id="listTitle">Elenco</h3>
@@ -554,11 +556,13 @@
 
       const isLive = tab === 'live';
       const isGirone = tab === 'girone';
-      $('formZone').style.display   = (isLive || isGirone) ? 'none' : '';
-      $('listCard').style.display   = (isLive || isGirone) ? 'none' : '';
-      $('matchHint').style.display  = (isLive || isGirone) ? 'none' : '';
+      const isSettings = tab === 'settings';
+      $('formZone').style.display   = (isLive || isGirone || isSettings) ? 'none' : '';
+      $('listCard').style.display   = (isLive || isGirone || isSettings) ? 'none' : '';
+      $('matchHint').style.display  = (isLive || isGirone || isSettings) ? 'none' : '';
       $('liveConsoleZone').style.display = isLive ? 'block' : 'none';
       $('gironeZone').style.display = isGirone ? 'block' : 'none';
+      $('settingsZone').style.display = isSettings ? 'block' : 'none';
 
       if (isLive){
         ensureSubscribed('matches');
@@ -568,11 +572,43 @@
         ensureSubscribed('matches');
         ensureSubscribed('standings');
         renderGironeTab();
+      } else if (isSettings){
+        renderSettingsTab();
       } else {
         renderForm();
         ensureSubscribed(tab);
         renderList();
       }
+    }
+
+    // ===================== TAB IMPOSTAZIONI (esempi notifiche, solo sul tuo dispositivo) =====================
+    function renderSettingsTab(){
+      const zone = $('settingsZone');
+      const esempi = [
+        {title:'🔴 È iniziata la diretta!', body:'Corbiolo - Illyrians, segui la diretta', label:'🔴 Esempio: Inizio diretta'},
+        {title:'⚽ GOL!', body:'Rossi (#7) — Corbiolo (2 - 1)', label:'⚽ Esempio: Gol'},
+        {title:'🥅 AUTOGOL!', body:'Bianchi (#4) (autogol) — Corbiolo (1 - 1)', label:'🥅 Esempio: Autogol'},
+        {title:'🟨 Ammonizione', body:'Verdi (#9) — Corbiolo', label:'🟨 Esempio: Ammonizione'},
+        {title:'🟥 Espulsione', body:'Neri (#2) — Corbiolo', label:'🟥 Esempio: Espulsione'},
+        {title:'⚠️ Partita rinviata', body:'Corbiolo - Avversario', label:'⚠️ Esempio: Rinviata/Annullata'},
+      ];
+      zone.innerHTML = `
+        <div class="hint">
+          🔔 Questi pulsanti mostrano come appare DAVVERO ogni tipo di notifica — ma solo sul TUO telefono,
+          in locale: nessuno viene avvisato, nessuna partita viene toccata.
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
+          ${esempi.map((e,i)=> `<button class="btn btn-ghost" data-settings-sample="${i}" style="width:100%;justify-content:center">${e.label}</button>`).join('')}
+        </div>
+      `;
+      zone.querySelectorAll('[data-settings-sample]').forEach(btn=>{
+        btn.onclick = async ()=>{
+          if (!('serviceWorker' in navigator)) return;
+          const e = esempi[+btn.dataset.settingsSample];
+          const reg = await navigator.serviceWorker.ready;
+          reg.active?.postMessage({ type: 'local-test-notify', title: e.title, body: e.body });
+        };
+      });
     }
 
     // ===================== TAB GIRONE (risultati altre squadre → classifica calcolata da sola) =====================
@@ -1391,7 +1427,7 @@
         t.onclick = ()=> switchTab(t.dataset.tab);
         if (isLiveOnly && t.dataset.tab !== 'live') t.style.display = 'none';
       });
-      switchTab(isLiveOnly ? 'live' : 'matches');
+      switchTab('live');
     }
   </script>
 
