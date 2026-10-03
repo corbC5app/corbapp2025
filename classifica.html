@@ -88,14 +88,12 @@
 
   <main class="container">
     <section class="card" id="classificaCard">
-      <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-        <h2 style="margin:0">Classifica</h2>
+      <h2 style="margin:0">Classifica</h2>
+      <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-top:8px">
         <div class="season-select" style="margin:0">
           <label for="seasonPick" class="small">Stagione</label>
           <select id="seasonPick"></select>
         </div>
-      </div>
-      <div class="row" style="justify-content:flex-end;margin-top:8px">
         <button type="button" id="toggleEstesaBtn" class="pill" style="cursor:pointer">Classifica estesa</button>
       </div>
       <div style="overflow-x:auto">
@@ -191,19 +189,24 @@
       const rowsConPosizione = rows.map((r, i) => ({ ...r, pos: i+1 }));
 
       let daMostrare = rowsConPosizione;
+      let nascosteSopra = 0, nascosteSotto = 0;
       if (!estesa){
         const idxMe = rowsConPosizione.findIndex(r => (r.squadra||'').trim().toLowerCase() === CORB);
         if (idxMe >= 0){
           const start = Math.max(0, idxMe - 3);
           const end = Math.min(rowsConPosizione.length, idxMe + 4);
           daMostrare = rowsConPosizione.slice(start, end);
+          nascosteSopra = start;
+          nascosteSotto = rowsConPosizione.length - end;
         }
       }
 
       const ZONE_CLASS = { 'Vincente':'zone-vincente', 'Promozione':'zone-promozione', 'Playoff':'zone-playoff', 'Coppa di Lega':'zone-coppa' };
       const STRIPE_CLASS = { 'Vincente':'stripe-vincente', 'Promozione':'stripe-promozione', 'Playoff':'stripe-playoff', 'Coppa di Lega':'stripe-coppa' };
 
-      tbody.innerHTML = daMostrare.map((r) => {
+      const righeDots = `<tr class="dots-row"><td colspan="10" style="text-align:center;letter-spacing:3px;color:var(--muted);padding:4px">⋯</td></tr>`;
+
+      const righeSquadre = daMostrare.map((r) => {
         const isMe = (r.squadra||'').trim().toLowerCase() === CORB;
         const dr = r.gf - r.gs;
         const zoneClass = ZONE_CLASS[r.zona] || '';
@@ -222,6 +225,8 @@
             <td>${dr>=0?'+':''}${dr}</td>
           </tr>`;
       }).join('');
+
+      tbody.innerHTML = (nascosteSopra > 0 ? righeDots : '') + righeSquadre + (nascosteSotto > 0 ? righeDots : '');
     }
 
     seasonPick.addEventListener('change', () => { selected = seasonPick.value; render(); renderScorers(); });
