@@ -17,6 +17,11 @@
     .std-table th{font-size:11px;text-transform:uppercase;color:var(--muted);text-align:center;padding:6px 4px;font-weight:700}
     .std-table th.team-col, .std-table td.team-col{text-align:left;padding-left:6px}
     .std-table td{text-align:center;padding:10px 4px;border-top:1px solid var(--ring)}
+    .std-table tr{border-left:4px solid transparent}
+    .std-table tr.stripe-vincente{border-left-color:#2563eb}
+    .std-table tr.stripe-promozione{border-left-color:#16a34a}
+    .std-table tr.stripe-playoff{border-left-color:#eab308}
+    .std-table tr.stripe-coppa{border-left-color:#9333ea}
     .std-table tr.me{background:#f5eef0}
     :root[data-theme="dark"] .std-table tr.me{background:#3a2530}
     .std-table .pos{font-weight:800;color:var(--muted);width:22px}
@@ -83,17 +88,16 @@
 
   <main class="container">
     <section class="card" id="classificaCard">
-      <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+      <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <h2 style="margin:0">Classifica</h2>
-        <div class="row" style="gap:10px;flex-wrap:wrap">
-          <div class="season-select" style="margin:0">
-            <label for="seasonPick" class="small">Stagione</label>
-            <select id="seasonPick"></select>
-          </div>
-          <button type="button" id="toggleEstesaBtn" class="pill-soft" style="cursor:pointer;border:1px solid var(--ring);background:var(--card);color:var(--text)">Classifica estesa</button>
+        <div class="season-select" style="margin:0">
+          <label for="seasonPick" class="small">Stagione</label>
+          <select id="seasonPick"></select>
         </div>
       </div>
-      <div id="compattaHint" class="small" style="margin-top:6px;color:var(--muted)"></div>
+      <div class="row" style="justify-content:flex-end;margin-top:8px">
+        <button type="button" id="toggleEstesaBtn" class="pill" style="cursor:pointer">Classifica estesa</button>
+      </div>
       <div style="overflow-x:auto">
         <table class="std-table">
           <thead>
@@ -146,7 +150,6 @@
     let estesa = false; // di default compatta: 3 sopra + Corbiolo + 3 sotto
 
     const toggleEstesaBtn = document.getElementById('toggleEstesaBtn');
-    const compattaHint = document.getElementById('compattaHint');
     toggleEstesaBtn.addEventListener('click', () => { estesa = !estesa; render(); });
 
     function populateSeasons(){
@@ -175,7 +178,6 @@
       if (!rows.length){
         tbody.innerHTML = '';
         empty.textContent = 'Classifica non ancora disponibile per questa stagione.';
-        compattaHint.textContent = '';
         toggleEstesaBtn.style.display = 'none';
         return;
       }
@@ -195,22 +197,19 @@
           const start = Math.max(0, idxMe - 3);
           const end = Math.min(rowsConPosizione.length, idxMe + 4);
           daMostrare = rowsConPosizione.slice(start, end);
-          compattaHint.textContent = `Le 3 squadre sopra e sotto il Corbiolo — tocca "Classifica estesa" per vederle tutte.`;
-        } else {
-          compattaHint.textContent = '';
         }
-      } else {
-        compattaHint.textContent = '';
       }
 
       const ZONE_CLASS = { 'Vincente':'zone-vincente', 'Promozione':'zone-promozione', 'Playoff':'zone-playoff', 'Coppa di Lega':'zone-coppa' };
+      const STRIPE_CLASS = { 'Vincente':'stripe-vincente', 'Promozione':'stripe-promozione', 'Playoff':'stripe-playoff', 'Coppa di Lega':'stripe-coppa' };
 
       tbody.innerHTML = daMostrare.map((r) => {
         const isMe = (r.squadra||'').trim().toLowerCase() === CORB;
         const dr = r.gf - r.gs;
         const zoneClass = ZONE_CLASS[r.zona] || '';
+        const stripeClass = STRIPE_CLASS[r.zona] || '';
         return `
-          <tr class="${isMe ? 'me' : ''}">
+          <tr class="${isMe ? 'me' : ''} ${stripeClass}">
             <td class="pos ${zoneClass}">${r.pos}</td>
             <td class="team-col team-name">${r.squadra}</td>
             <td class="pts">${r.punti}</td>
