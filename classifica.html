@@ -18,13 +18,6 @@
     .std-table th{font-size:11px;text-transform:uppercase;color:var(--muted);text-align:center;padding:6px 4px;font-weight:700}
     .std-table th.team-col, .std-table td.team-col{text-align:left;padding-left:6px}
     .std-table td{text-align:center;padding:10px 4px;border-top:1px solid var(--ring)}
-    .std-table tr{border-left:4px solid transparent}
-    .std-table tr.stripe-vincente{border-left-color:#2563eb}
-    .std-table tr.stripe-promozione{border-left-color:#16a34a}
-    .std-table tr.stripe-playoff{border-left-color:#eab308}
-    .std-table tr.stripe-coppa{border-left-color:#9333ea}
-    .std-table tr.stripe-playout{border-left-color:#f97316}
-    .std-table tr.stripe-retrocesse{border-left-color:#dc2626}
     .std-table tr.me{background:#f5eef0}
     :root[data-theme="dark"] .std-table tr.me{background:#3a2530}
     .std-table .pos{font-weight:800;color:var(--muted);width:22px}
@@ -45,7 +38,7 @@
     .zone-retrocesse{background:rgba(220,38,38,.16);color:#dc2626}
     .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;font-size:12px;color:var(--muted)}
     .legend span{display:inline-flex;align-items:center;gap:6px}
-    .legend .dot{width:5px;height:16px;border-radius:2px;display:inline-block}
+    .legend .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
     @media(max-width:420px){ .std-table{font-size:12px} .std-table th{font-size:10px} }
 
     /* Tema scuro: sfondo scuro vero (eredita dalla card), ma i colori delle
@@ -194,20 +187,25 @@
       // Calcolo la posizione VERA (1ª, 2ª...) sulla lista completa, prima di
       // eventualmente tagliarla per la vista compatta — così il numero mostrato
       // resta corretto anche quando si vedono solo poche righe.
-      // Se la zona non è stata assegnata a mano in Admin (caso del girone 26/27,
-      // calcolato da solo e senza quel campo), la deduco dalla posizione secondo
-      // le regole di quest'anno: 1-2 Vincente, 3-10 Playoff, 17-20 Playout, 21-22 Retrocesse.
-      function zonaDaPosizione(pos){
+      // Le zone cambiano da stagione a stagione (gironi di dimensioni diverse),
+      // quindi la deduco sempre dalla posizione invece che da un campo salvato a mano.
+      function zonaDaPosizione(pos, totale){
+        if (totale <= 15){
+          // Girone piccolo (tipo 2025/26): solo 1ª Vincente, 2ª-5ª Playoff.
+          if (pos === 1) return 'Vincente';
+          if (pos >= 2 && pos <= 5) return 'Promozione'; // verde, la legenda la chiama "Playoff"
+          return 'Nessuna';
+        }
+        // Girone unico da 22 squadre (tipo 2026/27).
         if (pos <= 2) return 'Vincente';
-        if (pos <= 10) return 'Promozione'; // verde — la legenda la chiama "Playoff" per quest'anno
+        if (pos <= 10) return 'Promozione'; // verde, la legenda la chiama "Playoff"
         if (pos >= 17 && pos <= 20) return 'Playout';
         if (pos >= 21) return 'Retrocesse';
         return 'Nessuna';
       }
       const rowsConPosizione = rows.map((r, i) => {
         const pos = i+1;
-        const zonaFinale = (r.zona && r.zona !== 'Nessuna') ? r.zona : zonaDaPosizione(pos);
-        return { ...r, pos, zona: zonaFinale };
+        return { ...r, pos, zona: zonaDaPosizione(pos, rows.length) };
       });
 
       let daMostrare = rowsConPosizione;
@@ -224,7 +222,6 @@
       }
 
       const ZONE_CLASS = { 'Vincente':'zone-vincente', 'Promozione':'zone-promozione', 'Playoff':'zone-playoff', 'Coppa di Lega':'zone-coppa', 'Playout':'zone-playout', 'Retrocesse':'zone-retrocesse' };
-      const STRIPE_CLASS = { 'Vincente':'stripe-vincente', 'Promozione':'stripe-promozione', 'Playoff':'stripe-playoff', 'Coppa di Lega':'stripe-coppa', 'Playout':'stripe-playout', 'Retrocesse':'stripe-retrocesse' };
 
       const righeDots = `<tr class="dots-row"><td colspan="10" style="text-align:center;letter-spacing:3px;color:var(--muted);padding:4px">⋯</td></tr>`;
 
@@ -232,9 +229,8 @@
         const isMe = (r.squadra||'').trim().toLowerCase() === CORB;
         const dr = r.gf - r.gs;
         const zoneClass = ZONE_CLASS[r.zona] || '';
-        const stripeClass = STRIPE_CLASS[r.zona] || '';
         return `
-          <tr class="${isMe ? 'me' : ''} ${stripeClass}">
+          <tr class="${isMe ? 'me' : ''}">
             <td class="pos ${zoneClass}">${r.pos}</td>
             <td class="team-col team-name">${r.squadra}</td>
             <td class="pts">${r.punti}</td>
