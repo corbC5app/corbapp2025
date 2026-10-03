@@ -2,7 +2,7 @@ name: Notifica diretta (inizio + gol)
 
 on:
   schedule:
-    - cron: '*/3 * * * *'   # ogni 3 minuti, ma manda solo se c'è davvero una diretta attiva
+    - cron: '*/3 17-22 * * 2-5'   # ogni 3 minuti, dalle 18 alle 23 (ora italiana), solo da martedì a venerdì
   workflow_dispatch: {}     # per testarlo a mano
 
 jobs:
