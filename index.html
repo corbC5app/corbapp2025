@@ -103,13 +103,12 @@
     <section class="grid-home">
       <a class="home-box" href="./competizioni.html"><span class="home-emoji">📋</span><div>Competizioni</div></a>
       <a class="home-box" href="./squadra.html"><span class="home-emoji">👥</span><div>Squadra</div></a>
-      <a class="home-box" href="./classifica.html" id="miniClassificaBox" style="justify-content:center;padding-top:8px;padding-bottom:8px"></a>
+      <a class="home-box" href="./classifica.html" id="miniClassificaBox" style="justify-content:center;padding-top:8px;padding-bottom:8px;grid-row:span 2"></a>
       <a class="home-box" href="./prossima.html"><span class="home-emoji">📅</span><div>Prossima Partita</div></a>
       <a class="home-box" href="./partite.html"><span class="home-emoji">🏆</span><div>Risultati</div></a>
-      <a class="home-box" href="./calendario.html"><span class="home-emoji">🗓️</span><div>Calendario</div></a>
       <a class="home-box" href="./news.html"><span class="home-emoji">📰</span><div>News</div></a>
       <a class="home-box" href="./video.html"><span class="home-emoji">🎥</span><div>Video</div></a>
-      <a class="home-box" href="./settings.html"><span class="home-emoji">🔔</span><div>Impostazioni</div></a>
+      <a class="home-box" href="./calendario.html"><span class="home-emoji">🗓️</span><div>Calendario</div></a>
     </section>
 
     <section class="panel-granata">
@@ -388,14 +387,14 @@
       const sopra = idx > 0 ? ordinata[idx-1] : null;
       const sotto = idx < ordinata.length-1 ? ordinata[idx+1] : null;
       const riga = (r, pos, isMe) => r ? `
-        <div style="display:flex;align-items:center;gap:4px;width:100%;${isMe?'font-weight:900':'opacity:.75'}">
-          <span style="font-size:9px;width:14px;flex-shrink:0">${pos}</span>
-          <span style="font-size:9.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.squadra}</span>
+        <div style="display:flex;align-items:center;gap:5px;width:100%;${isMe?'font-weight:900':'opacity:.75'}">
+          <span style="font-size:11px;width:16px;flex-shrink:0">${pos}</span>
+          <span style="font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.squadra}</span>
         </div>` : '';
 
       miniClassificaBox.innerHTML = `
-        <div style="font-size:10px;font-weight:800;margin-bottom:4px">🏅 Classifica</div>
-        <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;padding:0 6px">
+        <div style="font-size:12px;font-weight:800;margin-bottom:8px">🏅 Classifica</div>
+        <div style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;width:100%;padding:0 8px">
           ${riga(sopra, idx, false)}
           ${riga(ordinata[idx], idx+1, true)}
           ${riga(sotto, idx+2, false)}
