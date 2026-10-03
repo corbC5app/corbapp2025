@@ -329,7 +329,8 @@
       videos: {
         label: 'Video', api: Videos, subscribe: subscribeVideos,
         fields: [
-          {key:'stagione', label:'Stagione', type:'text', placeholder:'2025/26'},
+          {key:'stagione', label:'Categoria (titolo del gruppo — scrivine una nuova o scegli una già usata)', type:'datalist', placeholder:'es. Coppa 2026/27, Stagione 2025/26...',
+            options: ()=> [...new Set((cache.videos||[]).map(v=>v.stagione).filter(Boolean))]},
           {key:'nome', label:'Titolo video', type:'text'},
           {key:'link', label:"Link Instagram (es. https://www.instagram.com/reel/XXXXX/)", type:'text'},
           {key:'logo', label:'Copertina (URL, non serve per Instagram/YouTube)', type:'text'},
@@ -373,7 +374,8 @@
       }
       if (f.type === 'datalist'){
         const listId = 'dl-' + f.key;
-        const opts = f.options.map(o=>`<option value="${o}">`).join('');
+        const optsArr = typeof f.options === 'function' ? f.options() : f.options;
+        const opts = optsArr.map(o=>`<option value="${o}">`).join('');
         return `<label class="field"><span>${f.label}</span>
           <input data-key="${f.key}" type="text" list="${listId}" placeholder="${f.placeholder||''}" value="${v}"/>
           <datalist id="${listId}">${opts}</datalist>
