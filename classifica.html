@@ -90,12 +90,15 @@
   <main class="container">
     <section class="card" id="classificaCard">
       <h2 style="margin:0">Classifica</h2>
-      <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:nowrap;gap:6px;margin-top:8px;min-width:0">
-        <div class="season-select" style="margin:0;min-width:0">
-          <label for="seasonPick" class="small">Stagione</label>
-          <select id="seasonPick" style="padding:6px 8px;min-width:0"></select>
+      <div class="row" style="justify-content:space-between;align-items:flex-end;flex-wrap:nowrap;gap:8px;margin-top:10px;min-width:0">
+        <div style="min-width:0">
+          <div class="small" style="margin-bottom:4px">Stagione</div>
+          <select id="seasonPick" style="border:1px solid var(--ring);border-radius:12px;padding:8px 12px;background:var(--card);color:var(--text);font:inherit;font-weight:700;max-width:100%"></select>
         </div>
-        <button type="button" id="toggleEstesaBtn" class="pill" style="cursor:pointer;flex-shrink:0;white-space:nowrap;font-size:12px;padding:6px 10px">Classifica estesa</button>
+        <div style="min-width:0;text-align:right">
+          <div class="small" style="margin-bottom:4px">Classifica</div>
+          <button type="button" id="toggleEstesaBtn" class="pill" style="cursor:pointer;white-space:nowrap">Compatta</button>
+        </div>
       </div>
       <div style="overflow-x:auto">
         <table class="std-table">
@@ -182,7 +185,7 @@
       }
       empty.textContent = '';
       toggleEstesaBtn.style.display = '';
-      toggleEstesaBtn.textContent = estesa ? '🔽 Classifica compatta' : '🏅 Classifica estesa';
+      toggleEstesaBtn.textContent = estesa ? '🔽 Compatta' : '🏅 Estesa';
 
       // Calcolo la posizione VERA (1ª, 2ª...) sulla lista completa, prima di
       // eventualmente tagliarla per la vista compatta — così il numero mostrato
