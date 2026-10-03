@@ -957,23 +957,35 @@
     function renderLiveTab(){
       const zone = $('liveConsoleZone');
       const players = (cache.players || []);
-      const matches = (cache.matches || [])
-        .filter(m => (m.casa||'').trim().toLowerCase()==='corbiolo' || (m.fuori||'').trim().toLowerCase()==='corbiolo')
-        .slice().sort((a,b)=> (b.data||'').localeCompare(a.data||''));
+      const allMatches = (cache.matches || [])
+        .filter(m => (m.casa||'').trim().toLowerCase()==='corbiolo' || (m.fuori||'').trim().toLowerCase()==='corbiolo');
+
+      // Per la console/selezione corrente: tutte le partite (anche quelle già
+      // giocate, nel caso l'admin abbia scelto apposta una passata da correggere).
+      const matches = allMatches.slice().sort((a,b)=> (b.data||'').localeCompare(a.data||''));
 
       if (!liveState.matchId && matches.length){
-        liveState.matchId = matches[0].id;
-        liveState.team = (matches[0].casa||'').trim().toLowerCase()==='corbiolo' ? 'casa' : 'fuori';
+        // Parto dalla più vicina NON ancora giocata, non dalla più recente in assoluto.
+        const nonGiocate = allMatches.filter(m => !m.risultato).sort((a,b)=> (a.data||'').localeCompare(b.data||''));
+        const scelta = nonGiocate[0] || matches[0];
+        liveState.matchId = scelta.id;
+        liveState.team = (scelta.casa||'').trim().toLowerCase()==='corbiolo' ? 'casa' : 'fuori';
       }
       const match = matches.find(m => m.id === liveState.matchId);
 
-      // Raggruppo le partite per Coppa (tutte insieme) o Campionato/Amichevole per
-      // stagione, così l'elenco resta ordinato anche con più stagioni insieme —
-      // ogni gruppo parte chiuso, lo apri tu solo quando ti serve scegliere lì dentro.
+      // Elenco mostrato in questa schermata: SOLO partite non ancora giocate
+      // (niente storico qui, serve solo a scegliere velocemente per la diretta),
+      // ordinate dalla più vicina alla più lontana, Coppa divisa per stagione
+      // come il Campionato (così quella vecchia già finita sparisce da sola).
+      const matchesElenco = allMatches
+        .filter(m => !m.risultato)
+        .slice()
+        .sort((a,b)=> (a.data||'').localeCompare(b.data||''));
+
       const gruppi = {};
       const ordineGruppi = [];
-      matches.forEach(m=>{
-        const chiave = (m.tipo||'Campionato')==='Coppa' ? 'Coppa' : `${m.tipo||'Campionato'} ${m.stagione||''}`.trim();
+      matchesElenco.forEach(m=>{
+        const chiave = `${m.tipo||'Campionato'} ${m.stagione||''}`.trim();
         if (!gruppi[chiave]){ gruppi[chiave] = []; ordineGruppi.push(chiave); }
         gruppi[chiave].push(m);
       });
