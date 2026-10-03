@@ -28,7 +28,8 @@
     .tabs{display:flex;gap:8px;flex-wrap:wrap}
     .tab{border:1px solid var(--ring);background:var(--card);color:var(--text);border-radius:999px;padding:8px 14px;font-weight:700;cursor:pointer}
     .tab.active{background:#f5e7ea;border-color:#e4cbd3;color:#6b0f1a}
-    .item-row{display:flex;flex-direction:column;gap:8px;padding:10px 0;border-bottom:1px solid var(--ring)}
+    body{overflow-x:hidden}
+    .item-row{display:flex;flex-direction:column;gap:8px;padding:10px 0;border-bottom:1px solid var(--ring);overflow-wrap:break-word;word-break:break-word;max-width:100%}
     .item-row:last-child{border-bottom:0}
     .item-actions{display:flex;gap:6px;flex-wrap:wrap}
     .item-actions button{border:1px solid var(--ring);background:var(--card);color:var(--text);border-radius:8px;padding:5px 9px;font-size:11px;cursor:pointer}
@@ -172,10 +173,10 @@
       <div class="tabs" id="tabs" style="flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch">
         <button class="tab active" data-tab="live" style="flex-shrink:0">🔴 Diretta</button>
         <button class="tab" data-tab="girone" style="flex-shrink:0">🌍 Girone</button>
-        <button class="tab" data-tab="matches" style="flex-shrink:0">🏆 Partite</button>
-        <button class="tab" data-tab="news" style="flex-shrink:0">📰 News</button>
-        <button class="tab" data-tab="players" style="flex-shrink:0">👥 Giocatori</button>
         <button class="tab" data-tab="videos" style="flex-shrink:0">🎥 Video</button>
+        <button class="tab" data-tab="news" style="flex-shrink:0">📰 News</button>
+        <button class="tab" data-tab="matches" style="flex-shrink:0">🏆 Partite</button>
+        <button class="tab" data-tab="players" style="flex-shrink:0">👥 Giocatori</button>
         <button class="tab" data-tab="standings" style="flex-shrink:0">🏅 Classifica</button>
         <button class="tab" data-tab="settings" style="flex-shrink:0">⚙️ Impostazioni</button>
       </div>
