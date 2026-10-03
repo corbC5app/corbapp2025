@@ -103,7 +103,7 @@
     <section class="grid-home">
       <a class="home-box" href="./competizioni.html"><span class="home-emoji">📋</span><div>Competizioni</div></a>
       <a class="home-box" href="./squadra.html"><span class="home-emoji">👥</span><div>Squadra</div></a>
-      <a class="home-box" href="./classifica.html"><span class="home-emoji">🏅</span><div>Classifica</div></a>
+      <a class="home-box" href="./classifica.html" id="miniClassificaBox" style="justify-content:center;padding-top:8px;padding-bottom:8px"></a>
       <a class="home-box" href="./prossima.html"><span class="home-emoji">📅</span><div>Prossima Partita</div></a>
       <a class="home-box" href="./partite.html"><span class="home-emoji">🏆</span><div>Risultati</div></a>
       <a class="home-box" href="./calendario.html"><span class="home-emoji">🗓️</span><div>Calendario</div></a>
@@ -154,7 +154,7 @@
   </main>
 
   <script type="module">
-    import { subscribeMatches, subscribeNews } from './data-store.js';
+    import { subscribeMatches, subscribeNews, subscribeStandings, currentSeason } from './data-store.js';
 
     // Drawer
     const drawer = document.getElementById('drawer');
@@ -252,33 +252,17 @@
             ${homeBadge}
             <span style="font-size:11px;text-align:center">${homeName}</span>
           </div>
-          <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
-            ${giornataTxt ? `<span style="font-size:9px;opacity:.7">${giornataTxt}</span>` : ''}
-            <span style="font-size:9px;opacity:.7">${tipo}</span>
-            <span style="font-size:9px;opacity:.7">${giornoOraTxt}</span>
+          <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+            ${giornataTxt ? `<span style="font-size:13px;font-weight:700;opacity:.9">${giornataTxt}</span>` : ''}
+            <span style="font-size:13px;font-weight:700;opacity:.9">${tipo}</span>
+            <span style="font-size:13px;font-weight:700;opacity:.9">${giornoOraTxt}</span>
           </div>
           <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:80px">
             ${awayBadge}
             <span style="font-size:11px;text-align:center">${awayName}</span>
           </div>
         </div>
-        ${indirizzo ? `<div style="font-size:10px;opacity:.7;margin-top:6px">${indirizzo}</div>` : ''}
-        <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-top:14px">
-          <div style="background:#fff;color:var(--granata);border-radius:10px;padding:8px 12px;min-width:48px;text-align:center">
-            <div style="font-size:24px;font-weight:900;line-height:1">${pad(days)}</div>
-            <div style="font-size:9px;font-weight:700;color:var(--muted);letter-spacing:.5px">GG</div>
-          </div>
-          <span style="font-size:22px;font-weight:900">:</span>
-          <div style="background:#fff;color:var(--granata);border-radius:10px;padding:8px 12px;min-width:48px;text-align:center">
-            <div style="font-size:24px;font-weight:900;line-height:1">${pad(hours)}</div>
-            <div style="font-size:9px;font-weight:700;color:var(--muted);letter-spacing:.5px">ORE</div>
-          </div>
-          <span style="font-size:22px;font-weight:900">:</span>
-          <div style="background:#fff;color:var(--granata);border-radius:10px;padding:8px 12px;min-width:48px;text-align:center">
-            <div style="font-size:24px;font-weight:900;line-height:1">${pad(mins)}</div>
-            <div style="font-size:9px;font-weight:700;color:var(--muted);letter-spacing:.5px">MIN</div>
-          </div>
-        </div>`;
+        ${indirizzo ? `<div style="font-size:12px;opacity:.8;margin-top:10px;text-align:center">${indirizzo}</div>` : ''}`;
     }
 
     // 👇 Si aggiorna DA SOLO ogni volta che qualcosa cambia nel database,
@@ -386,6 +370,36 @@
               ${n.img ? `<img src="${n.img}" alt="" class="news-mini-thumb" loading="lazy" onerror="this.style.display='none'">` : ''}
             </a>`).join('')
         : '<div class="small" style="color:#f3f3f3">Nessuna notizia disponibile</div>';
+    });
+
+    const miniClassificaBox = document.getElementById('miniClassificaBox');
+    subscribeStandings((rows) => {
+      const stagione = currentSeason();
+      const ordinata = (rows||[])
+        .filter(r => r.stagione === stagione)
+        .slice()
+        .sort((a,b) => (+b.punti||0) - (+a.punti||0) || ((+b.gf||0)-(+b.gs||0)) - ((+a.gf||0)-(+a.gs||0)));
+
+      const idx = ordinata.findIndex(r => (r.squadra||'').trim().toLowerCase() === 'corbiolo');
+      if (idx < 0 || !ordinata.length){
+        miniClassificaBox.innerHTML = `<span class="home-emoji">🏅</span><div>Classifica</div>`;
+        return;
+      }
+      const sopra = idx > 0 ? ordinata[idx-1] : null;
+      const sotto = idx < ordinata.length-1 ? ordinata[idx+1] : null;
+      const riga = (r, pos, isMe) => r ? `
+        <div style="display:flex;align-items:center;gap:4px;width:100%;${isMe?'font-weight:900':'opacity:.75'}">
+          <span style="font-size:9px;width:14px;flex-shrink:0">${pos}</span>
+          <span style="font-size:9.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.squadra}</span>
+        </div>` : '';
+
+      miniClassificaBox.innerHTML = `
+        <div style="font-size:10px;font-weight:800;margin-bottom:4px">🏅 Classifica</div>
+        <div style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;padding:0 6px">
+          ${riga(sopra, idx, false)}
+          ${riga(ordinata[idx], idx+1, true)}
+          ${riga(sotto, idx+2, false)}
+        </div>`;
     });
 
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
