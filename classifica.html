@@ -90,15 +90,12 @@
   <main class="container">
     <section class="card" id="classificaCard">
       <h2 style="margin:0">Classifica</h2>
-      <div class="row" style="justify-content:space-between;align-items:flex-end;flex-wrap:nowrap;gap:8px;margin-top:10px;min-width:0">
-        <div style="min-width:0">
-          <div class="small" style="margin-bottom:4px">Stagione</div>
-          <select id="seasonPick" style="border:1px solid var(--ring);border-radius:12px;padding:8px 12px;background:var(--card);color:var(--text);font:inherit;font-weight:700;max-width:100%"></select>
+      <div class="row" style="justify-content:space-between;align-items:center;flex-wrap:nowrap;gap:8px;margin-top:10px;min-width:0">
+        <div class="pill" style="display:flex;align-items:center;gap:6px;min-width:0">
+          <span style="flex-shrink:0">Stagione</span>
+          <select id="seasonPick" style="border:none;background:transparent;color:inherit;font:inherit;font-weight:700;min-width:0;max-width:100%"></select>
         </div>
-        <div style="min-width:0;text-align:right">
-          <div class="small" style="margin-bottom:4px">Classifica</div>
-          <button type="button" id="toggleEstesaBtn" class="pill" style="cursor:pointer;white-space:nowrap">Compatta</button>
-        </div>
+        <button type="button" id="toggleEstesaBtn" class="pill" style="cursor:pointer;white-space:nowrap;flex-shrink:0">Compatta</button>
       </div>
       <div style="overflow-x:auto">
         <table class="std-table">
