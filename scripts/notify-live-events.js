@@ -31,13 +31,22 @@ async function main(){
     await Promise.all(toReset.map(d => d.ref.update({ liveNotified:false, notifiedEventCount:0 })));
   }
 
+  // Il calendario ora contiene TUTTE le partite del girone (22 squadre), quindi
+  // per ogni notifica controllo sempre che sia davvero una partita del Corbiolo,
+  // non una qualsiasi delle altre squadre.
+  function isCorbioloMatch(m){
+    const casa = (m.casa||'').trim().toLowerCase();
+    const fuori = (m.fuori||'').trim().toLowerCase();
+    return casa === 'corbiolo' || fuori === 'corbiolo';
+  }
+
   // Solo le partite ATTUALMENTE in diretta contano per gol/inizio-diretta
-  const live = snap.docs.filter(d => d.data().live === 'Sì');
+  const live = snap.docs.filter(d => d.data().live === 'Sì' && isCorbioloMatch(d.data()));
 
   // Partite con un rinvio/annullamento da notificare (indipendente dalla diretta)
   const daNotificareStato = snap.docs.filter(d => {
     const m = d.data();
-    return (m.stato === 'Rinviata' || m.stato === 'Annullata') && !m.statoNotificato;
+    return (m.stato === 'Rinviata' || m.stato === 'Annullata') && !m.statoNotificato && isCorbioloMatch(m);
   });
   const daRiarmareStato = snap.docs.filter(d => {
     const m = d.data();
@@ -106,7 +115,7 @@ async function main(){
 
     for (const line of nuovi){
       // Formato riga: "1°T 23' ⚽ Melotti Matteo (#7) — Corbiolo"
-      const match = line.match(/(⚽|🟨|🟥)\s+(.+?)\s+—\s+(.+)$/);
+      const match = line.match(/(⚽|🥅|🟨|🟥)\s+(.+?)\s+—\s+(.+)$/);
       if (!match) continue; // riga non riconosciuta (es. "Fine 1° tempo", "Time-out"): ignoro
 
       const [, emoji, who, team] = match;
@@ -116,6 +125,10 @@ async function main(){
       if (emoji === '⚽'){
         const body = isCorb ? `${who} — Corbiolo${punteggio}` : `${team}${punteggio}`;
         await sendPush('⚽ GOL!', body, 'gol');
+      } else if (emoji === '🥅'){
+        // Autogol: il punto va alla squadra AVVERSARIA rispetto a chi lo segna
+        const body = isCorb ? `${who} (autogol) — Corbiolo${punteggio}` : `${team} (autogol)${punteggio}`;
+        await sendPush('🥅 AUTOGOL!', body, 'autogol');
       } else if (emoji === '🟨'){
         if (isCorb) await sendPush('🟨 Ammonizione', `${who} — Corbiolo`, 'giallo');
         // giallo avversario: nessuna notifica, come richiesto

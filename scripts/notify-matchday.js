@@ -28,9 +28,18 @@ async function main(){
   const today = todayInItaly();
   console.log('Controllo partite per la data:', today);
 
-  const snap = await db.collection('matches').where('data', '==', today).get();
-  if (snap.empty){
-    console.log('Nessuna partita oggi, nessuna notifica da inviare.');
+  const snapTutte = await db.collection('matches').where('data', '==', today).get();
+  // Il calendario ora contiene TUTTE le partite del girone (22 squadre), non solo
+  // le vostre — quindi filtro solo quelle in cui gioca davvero il Corbiolo,
+  // altrimenti arriverebbe una notifica anche per le partite delle altre squadre.
+  const docsCorbiolo = snapTutte.docs.filter(doc => {
+    const m = doc.data();
+    const casa = (m.casa||'').trim().toLowerCase();
+    const fuori = (m.fuori||'').trim().toLowerCase();
+    return casa === 'corbiolo' || fuori === 'corbiolo';
+  });
+  if (!docsCorbiolo.length){
+    console.log('Nessuna partita del Corbiolo oggi, nessuna notifica da inviare.');
     return;
   }
 
@@ -41,7 +50,7 @@ async function main(){
     return;
   }
 
-  for (const doc of snap.docs){
+  for (const doc of docsCorbiolo){
     const m = doc.data();
     const casa  = m.casa  || 'Corbiolo';
     const fuori = m.fuori || 'Avversario';
