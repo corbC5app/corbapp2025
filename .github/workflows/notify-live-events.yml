@@ -1,9 +1,9 @@
-name: Notifica diretta (inizio + gol)
+name: Notifica live eventi
 
 on:
   schedule:
-    - cron: '*/3 17-22 * * 2-5'   # ogni 3 minuti, dalle 18 alle 23 (ora italiana), solo da martedì a venerdì
-  workflow_dispatch: {}     # per testarlo a mano
+    - cron: '*/3 17-22 * * 2-5'   # ogni 3 minuti, mar-ven, 19-24 ora italiana (UTC+2)
+  workflow_dispatch: {}            # lancio manuale da GitHub
 
 jobs:
   notify:
@@ -21,7 +21,7 @@ jobs:
         working-directory: ./scripts
         run: npm install
 
-      - name: Controlla dirette e invia notifiche
+      - name: Controlla dirette e invia notifiche (solo Corbiolo)
         working-directory: ./scripts
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
