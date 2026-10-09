@@ -100,7 +100,7 @@
         <span id="liveMinute" style="font-size:13px;opacity:.9"></span>
       </div>
       <div id="liveScoreRow" style="display:flex;align-items:center;justify-content:space-between;margin-top:10px"></div>
-      <div id="liveEvents" style="margin-top:12px;border-top:1px solid #ffffff33;padding-top:10px;font-size:13px"></div>
+      <div id="liveEvents" style="margin-top:12px;border-top:2px solid #ffffff44;padding-top:6px;font-size:13px;max-height:320px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain"></div>
     </section>
 
     <section class="grid-home">
@@ -369,9 +369,12 @@
           </div>`;
 
         const eventiLines = Array.isArray(liveMatch.eventi) ? liveMatch.eventi : [];
-        document.getElementById('liveEvents').innerHTML = eventiLines.length
-          ? eventiLines.slice().reverse().map(l => `<div style="padding:3px 0">${l}</div>`).join('')
+        const liveEv = document.getElementById('liveEvents');
+        const prevScroll = liveEv.scrollTop;
+        liveEv.innerHTML = eventiLines.length
+          ? `<div style="--ring:#ffffff55;--muted:#ffffffb8;--card:var(--granata)">${cronacaHTML(eventiLines, homeName, awayName)}</div>`
           : '';
+        liveEv.scrollTop = prevScroll;
       } else {
         liveBox.style.display = 'none';
         if (liveTickTimer){ clearInterval(liveTickTimer); liveTickTimer = null; }
