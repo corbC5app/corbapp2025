@@ -46,6 +46,9 @@
       max-width:340px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.35);
       animation:day-pop .15s ease-out;
     }
+    #matchDetailCard{display:flex;flex-direction:column;max-height:85vh;overflow:hidden}
+    #matchDetailCard>*{flex-shrink:0}
+    #matchDetailCard>.md-scroll{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
     @keyframes day-pop{ from{ transform:scale(.92); opacity:0 } to{ transform:scale(1); opacity:1 } }
   </style>
 </head>
@@ -172,6 +175,52 @@
     const matchDetailCard = document.getElementById('matchDetailCard');
     matchDetailOverlay.addEventListener('click', (e)=>{ if (e.target === matchDetailOverlay) matchDetailOverlay.style.display='none'; });
 
+
+    // Cronaca a timeline: linea centrale, squadra di casa a sinistra, ospite a destra, più recenti in alto
+    function cronacaHTML(eventi, homeName, awayName){
+      const H = (homeName||'').trim().toLowerCase();
+      const dots = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#fff;border:1px solid #bbb;vertical-align:middle;margin:0 1px 1px 0"></span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6b0f1a;vertical-align:middle;margin:0 3px 1px 0"></span>';
+      const COLS = 'grid-template-columns:minmax(0,1fr) 42px minmax(0,1fr)';
+      const line = (bottom) => `<div style="position:absolute;top:0;bottom:${bottom||0};left:50%;border-left:2px dotted var(--ring)"></div>`;
+      const circle = (ico) => `<div style="position:relative;z-index:1;width:30px;height:30px;border-radius:50%;background:var(--card,#fff);border:1px solid var(--ring);display:flex;align-items:center;justify-content:center;font-size:15px">${ico}</div>`;
+      const center = (ico, bottom) => `<div style="position:relative;display:flex;align-items:center;justify-content:center;align-self:stretch">${line(bottom)}${circle(ico)}</div>`;
+      let lastScore = '0 - 0';
+      const rows = [];
+      eventi.forEach(e=>{
+        const s = String(e).trim();
+        const i = s.lastIndexOf(' — ');
+        if (i < 0){
+          const label = s.replace(/^—\s*/,'').replace(/\s*—$/,'');
+          rows.push(`<div style="display:grid;${COLS};align-items:center"><div style="grid-column:1 / 4;text-align:center;padding:10px 0;font-weight:800;font-size:14px">${label} <span style="font-weight:600;margin-left:6px">${lastScore}</span></div></div>`);
+          return;
+        }
+        let body = s.slice(0, i).trim();
+        const team = s.slice(i + 3).trim();
+        let time = '', per = '';
+        const t = body.match(/^(\S+)\s+(\d+)['’]\s+(.*)$/);
+        if (t){ per = t[1]; time = t[2] + "'"; body = t[3]; }
+        const m = body.match(/^(\S+)\s+(.*)$/);
+        const ico = m ? m[1] : '•';
+        const txt = m ? m[2] : body;
+        const sc = txt.match(/^(\d+)\s*[-–]\s*(\d+)/);
+        if (sc) lastScore = sc[1] + ' - ' + sc[2];
+        const isCorb = team.toLowerCase() === 'corbiolo';
+        const who = `<div style="font-size:13px;font-weight:600;line-height:1.25;word-break:break-word">${txt}</div>`;
+        const tm = `<div><span style="font-size:14px;font-weight:800">${time}</span> <span style="font-size:11px;color:var(--muted);margin-left:3px">${per}</span></div>`;
+        const left = team.toLowerCase() === H;
+        rows.push(`<div style="display:grid;${COLS};align-items:center">`
+          + (left
+              ? `<div style="padding:7px 4px 7px 0;text-align:right">${who}</div>${center(ico)}<div style="padding:7px 0 7px 4px">${tm}</div>`
+              : `<div style="padding:7px 4px 7px 0;text-align:right">${tm}</div>${center(ico)}<div style="padding:7px 0 7px 4px">${who}</div>`)
+          + `</div>`);
+      });
+      if (rows.length){
+        rows.reverse(); // più recenti in alto
+        rows.push(`<div style="display:grid;${COLS};align-items:center"><div></div>${center('⏱️','50%')}<div style="padding:0 0 0 4px;font-size:11px;color:var(--muted)">Inizio</div></div>`);
+      }
+      return rows.join('');
+    }
+
     function showMatchDetail(m){
       const homeName = (m.casa || 'Corbiolo').trim();
       const awayName = (m.fuori || 'Avversario').trim();
@@ -196,11 +245,13 @@
             ${awayBadge}<span style="font-size:12px;text-align:center;font-weight:700">${awayName}</span>
           </div>
         </div>
-        <div style="margin-top:14px;border-top:1px solid var(--ring);padding-top:8px">
+        <div style="margin-top:12px;border-top:2px solid var(--ring)"></div>
+        <div class="md-scroll">
+        <div style="padding-top:8px">
           <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px">CRONACA</div>
-          <div style="max-height:220px;overflow-y:auto">
+          <div>
             ${eventi.length
-              ? eventi.map(e=>`<div style="padding:6px 0;border-bottom:1px solid var(--ring);font-size:13px">${e}</div>`).join('')
+              ? cronacaHTML(eventi, homeName, awayName)
               : '<div class="small" style="padding:6px 0">Nessuna cronaca registrata per questa partita.</div>'}
           </div>
         </div>
@@ -208,7 +259,8 @@
         <div style="margin-top:12px;border-top:1px solid var(--ring);padding-top:8px">
           <div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px">COMMENTO</div>
           <div style="font-size:13px;line-height:1.5">${m.commento}</div>
-        </div>` : ''}`;
+        </div>` : ''}
+        </div>`;
       matchDetailOverlay.style.display = 'flex';
       document.getElementById('closeMatchDetail').onclick = ()=> matchDetailOverlay.style.display='none';
     }
