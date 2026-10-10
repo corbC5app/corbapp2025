@@ -187,7 +187,7 @@
       let lastScore = '0 - 0';
       const rows = [];
       eventi.forEach(e=>{
-        const s = String(e).trim();
+        const s = String(e).replace(/\s*\(\s*60\s*['’"]{1,2}\s*di pausa\s*\)/i,'').trim(); // toglie "(60'' di pausa)" anche dai time-out già registrati
         const i = s.lastIndexOf(' — ');
         if (i < 0){
           const label = s.replace(/^—\s*/,'').replace(/\s*—$/,'');
