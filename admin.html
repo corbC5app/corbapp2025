@@ -330,8 +330,8 @@
       videos: {
         label: 'Video', api: Videos, subscribe: subscribeVideos,
         fields: [
-          {key:'stagione', label:'Categoria (titolo del gruppo — scrivine una nuova o scegli una già usata)', type:'datalist', placeholder:'es. Coppa 2026/27, Stagione 2025/26...',
-            options: ()=> [...new Set((cache.videos||[]).map(v=>v.stagione).filter(Boolean))]},
+          {key:'stagione', label:'Categoria (titolo del gruppo — scegli dal menu o scrivine una nuova)', type:'catpick', placeholder:'es. Coppa 2026/27, Stagione 2025/26...',
+            options: ()=> [...new Set([`Campionato ${currentSeason()}`, ...(cache.videos||[]).map(v=>v.stagione).filter(Boolean)])]},
           {key:'nome', label:'Titolo video', type:'text'},
           {key:'link', label:"Link Instagram (es. https://www.instagram.com/reel/XXXXX/)", type:'text'},
           {key:'logo', label:'Copertina (URL, non serve per Instagram/YouTube)', type:'text'},
@@ -382,6 +382,18 @@
           <datalist id="${listId}">${opts}</datalist>
         </label>`;
       }
+      if (f.type === 'catpick'){
+        const optsArr = (typeof f.options === 'function' ? f.options() : f.options);
+        const opts = optsArr.map(o=>`<option value="${o}" ${o===v?'selected':''}>${o}</option>`).join('');
+        const noMatch = v && !optsArr.includes(v);
+        return `<div class="field"><span>${f.label}</span>
+          <select class="cat-pick" style="margin-bottom:6px">
+            ${opts}${noMatch ? `<option value="${v}" selected>${v}</option>` : ''}
+            <option value="__new__">➕ Nuova categoria…</option>
+          </select>
+          <input data-key="${f.key}" type="text" placeholder="${f.placeholder||''}" value="${v}"/>
+        </div>`;
+      }
       return `<label class="field"><span>${f.label}</span><input data-key="${f.key}" type="${f.type}" placeholder="${f.placeholder||''}" value="${v}"/></label>`;
     }
 
@@ -398,7 +410,7 @@
               let defaultValue = '';
               if (!prefill && (currentTab==='matches' || currentTab==='standings' || currentTab==='videos')){
                 if (f.key==='casa') defaultValue = 'Corbiolo';
-                if (f.key==='stagione') defaultValue = currentSeason();
+                if (f.key==='stagione') defaultValue = currentTab==='videos' ? `Campionato ${currentSeason()}` : currentSeason();
                 if (f.key==='live') defaultValue = 'No';
                 if (f.key==='stato') defaultValue = 'Regolare';
                 if (f.key==='speciale') defaultValue = 'No';
@@ -412,6 +424,15 @@
             ${editingId ? '<button id="cancelEditBtn" class="btn btn-ghost">Annulla</button>' : ''}
           </div>
         </div>`;
+
+      const catSel = zone.querySelector('.cat-pick');
+      if (catSel){
+        const catInput = zone.querySelector('[data-key="stagione"]');
+        catSel.onchange = ()=>{
+          if (catSel.value === '__new__'){ catInput.value = ''; catInput.focus(); }
+          else catInput.value = catSel.value;
+        };
+      }
 
       $('saveItemBtn').onclick = async ()=>{
         const data = {};
@@ -466,10 +487,6 @@
         <div class="item-row">
           <div>${ent.itemLabel(r)}</div>
           <div class="item-actions">
-            ${currentTab==='videos' ? `
-              <button data-act="up" data-id="${r.id}" ${i===0?'disabled':''}>⬆️</button>
-              <button data-act="down" data-id="${r.id}" ${i===rows.length-1?'disabled':''}>⬇️</button>
-            ` : ''}
             <button data-act="edit" data-id="${r.id}">✏️ Modifica</button>
             <button data-act="del" data-id="${r.id}">🗑️ Elimina</button>
             ${currentTab==='matches' ? `<button data-act="cronaca" data-id="${r.id}">📓 Cronaca</button>` : ''}
@@ -501,6 +518,41 @@
           b.onclick = ()=>{
             const k = b.dataset.listgroup;
             listOpenGroups[k] = !listOpenGroups[k];
+            renderList();
+          };
+        });
+      } else if (currentTab === 'videos' && rows.length){
+        // Raggruppo per categoria. Dentro ogni gruppo: dal video più recente; i
+        // gruppi sono ordinati per il video più recente che contengono.
+        const ts = (v)=>{
+          const c = v.createdAt;
+          if (c && typeof c.toMillis === 'function') return c.toMillis();
+          if (c && c.seconds) return c.seconds*1000;
+          return c ? 0 : (v.createdAt === null ? Date.now() : 0); // appena aggiunto: ancora senza data = il più nuovo
+        };
+        const gruppi = {};
+        rows.forEach(r=>{
+          const chiave = r.stagione || 'Senza categoria';
+          (gruppi[chiave] = gruppi[chiave] || []).push(r);
+        });
+        Object.values(gruppi).forEach(g => g.sort((a,b)=> ts(b) - ts(a)));
+        const chiavi = Object.keys(gruppi).sort((a,b)=> ts(gruppi[b][0]) - ts(gruppi[a][0]));
+        $('listZone').innerHTML = chiavi.map((chiave, idx)=>{
+          const k = 'video:' + chiave;
+          const isOpen = (k in listOpenGroups) ? !!listOpenGroups[k] : idx === 0; // il primo gruppo è aperto di default
+          return `
+            <div class="live-group">
+              <button class="live-group-header" data-listgroup="${k}">
+                <span>${chiave} (${gruppi[chiave].length})</span><span>${isOpen?'▲':'▼'}</span>
+              </button>
+              ${isOpen ? gruppi[chiave].map(r => rowHtml(r, 0)).join('') : ''}
+            </div>`;
+        }).join('');
+        $('listZone').querySelectorAll('[data-listgroup]').forEach(b=>{
+          b.onclick = ()=>{
+            const k = b.dataset.listgroup;
+            const wasOpen = (k in listOpenGroups) ? !!listOpenGroups[k] : (b.querySelector('span:last-child').textContent.trim()==='▲');
+            listOpenGroups[k] = !wasOpen;
             renderList();
           };
         });

@@ -176,7 +176,8 @@
       };
 
       box.innerHTML = seasons.map(s => {
-        const videos = bySeason[s].slice().sort((a,b) => (+a.ordine||0) - (+b.ordine||0));
+        const tsV = (x)=>{ const c=x.createdAt; return c && typeof c.toMillis==='function' ? c.toMillis() : (c && c.seconds ? c.seconds*1000 : 0); };
+        const videos = bySeason[s].slice().sort((a,b) => tsV(b) - tsV(a)); // più recente prima
         const isOpen = !!openSeasons[s];
         return `
           <div class="season-block">
