@@ -728,7 +728,32 @@
       const matchesStagione = matches.filter(m => m.stagione === gironeState.stagione && (m.tipo||'Campionato')==='Campionato');
 
       const giornateDisponibili = [...new Set(matchesStagione.map(m=>+m.giornata||0))].filter(g=>g>0).sort((a,b)=>a-b);
-      if (!gironeState.giornata || !giornateDisponibili.includes(gironeState.giornata)) gironeState.giornata = giornateDisponibili[0] || 1;
+      if (!gironeState.giornata || !giornateDisponibili.includes(gironeState.giornata)){
+        // Giornata iniziale automatica (scatta solo all'apertura / cambio stagione;
+        // se poi navighi a mano con le frecce, non viene sovrascritta).
+        // 1) Se c'è una partita nella settimana corrente (lun-dom) -> quella giornata.
+        // 2) Altrimenti la prima giornata con meno del 90% di risultati inseriti
+        //    (se sono tutte >= 90%, l'ultima).
+        const oggi = new Date(); oggi.setHours(0,0,0,0);
+        const lun = new Date(oggi); lun.setDate(oggi.getDate() - ((oggi.getDay()+6) % 7));
+        const dom = new Date(lun); dom.setDate(lun.getDate() + 6); dom.setHours(23,59,59,999);
+        const dataLocale = str => { const t = /^(\d{4})-(\d{2})-(\d{2})/.exec(str || ''); return t ? new Date(+t[1], +t[2]-1, +t[3]) : null; };
+        const inSettimana = matchesStagione.find(m => { const d = dataLocale(m.data); return d && d >= lun && d <= dom && (+m.giornata||0) > 0; });
+
+        let auto;
+        if (inSettimana){
+          auto = +inSettimana.giornata;
+        } else {
+          const giocata = m => /^\d+\s*[-–]\s*\d+$/.test((m.risultato || '').trim());
+          auto = giornateDisponibili[0] || 1;
+          for (const g of giornateDisponibili){
+            auto = g;
+            const lista = matchesStagione.filter(m => (+m.giornata||0) === g);
+            if (lista.filter(giocata).length / lista.length < 0.9) break;
+          }
+        }
+        gironeState.giornata = auto;
+      }
 
       const matchesGiornata = matchesStagione.filter(m => (+m.giornata||0) === gironeState.giornata);
       const classificaCalcolata = calcolaClassifica(matchesStagione, gironeState.risultatiEdits);
