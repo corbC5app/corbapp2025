@@ -88,3 +88,37 @@ export const Standings = {
   update: (id, data) => updateItem(COLLECTIONS.standings, id, data),
   remove: (id) => deleteItem(COLLECTIONS.standings, id),
 };
+
+// ===== Campi di gioco delle squadre (fonte: CSI Live, "Squadre iscritte") =====
+// Serve per mostrare la via quando il Corbiolo gioca IN TRASFERTA: è il campo della squadra di casa.
+// Il confronto ignora maiuscole, accenti, punti e apici ("C.U.S. Verona A.S.D." = "cus verona").
+// Nuova Cometa: indirizzo non ancora inserito.
+const _CAMPI = [
+  ['union best',        "Campo Polisportiva Erbè, Via San Giuseppe 1, 37060 Erbè"],
+  ['guidizzolo',        "C.S. Comunale - Campo Coperto, Via Matteotti 9, 46040 Guidizzolo"],
+  ['ponte crencano',    "Campo Avesa, Via Delle Agostiniane, 37127 Verona"],
+  ['beer club',         "C.S. Avanzi, Via Flavio Gioia, 37100 Verona"],
+  ['cus verona',        "Palazzetto Gavagnin (parquet), Via Montelungo, 37131 Verona"],
+  ['confimpresaitalia', "Palazzetto dello Sport, Via dell'Artigianato, 37040 Zimella"],
+  ['curacao',           "C.S. Avanzi, Via Flavio Gioia, 37100 Verona"],
+  ['flip off',          "C.S. Avanzi, Via Flavio Gioia, 37100 Verona"],
+  ['casaloldo',         "Palestra Comunale Casaloldo, Via Montegrappa 12, 46040 Casaloldo"],
+  ['goto mit uns',      "C.S. Avanzi, Via Flavio Gioia, 37100 Verona"],
+  ['hammers',           "C.S. Avanzi, Via Flavio Gioia, 37100 Verona"],
+  ['conte di verona',   "C.S. De Stefani, Via Gran Sasso 1, 37132 Verona"],
+  ['taverna',           "Campo Sintetico, Via Alcide De Gasperi, 37035 San Giovanni Ilarione"],
+  ['oto',               "C.S. De Stefani, Via Gran Sasso 1, 37132 Verona"],
+  ['pdc',               "Campo Sportivo, Via Prealpi 15A, Stallavena-Lugo, 37023 Verona"],
+  ['peretti cofer',     "Esperia Circolo Sportivo, Via Marin Faliero 98, Saval, 37138 Verona"],
+  ['rosegaferro',       "Impianti Sportivi di Rosegaferro, Via Giuseppe Zamboni 20, 37069 Verona"],
+  ['muchachos',         "C.S. De Stefani, Via Gran Sasso 1, 37132 Verona"],
+  ['real vigo',         "Impianti Sportivi, Via Bassa 1, 37066 Sommacampagna"],
+  ['scaligeri',         "C.S. Avanzi, Via Flavio Gioia, 37100 Verona"],
+];
+const _normSq = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/[.'’]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+export function viaCampoSquadra(nome){
+  const n = ' ' + _normSq(nome) + ' ';
+  const r = _CAMPI.find(([k]) => n.includes(' ' + k + ' '));
+  return r ? r[1] : '';
+}

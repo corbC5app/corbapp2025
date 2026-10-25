@@ -72,6 +72,7 @@
       </div>
       <div id="nextBlock" class="versus" style="margin-top:10px"></div>
       <div id="nextMeta" class="metaRow"></div>
+      <div id="nextVenue" style="font-size:11px;opacity:.75;margin-top:8px"></div>
       <button id="addCalBtn" class="pill-soft" style="display:none;border:1px solid #ffffff44;cursor:pointer;margin-top:8px;align-items:center;gap:6px">📅 Aggiungi al calendario</button>
     </section>
 
@@ -82,7 +83,7 @@
   </main>
 
   <script type="module">
-    import { subscribeMatches } from './data-store.js';
+    import { subscribeMatches, viaCampoSquadra } from './data-store.js';
 
     const drawer = document.getElementById('drawer');
     document.getElementById('menuBtn').onclick = (e)=>{e.stopPropagation();drawer.classList.add('open')};
@@ -185,12 +186,17 @@
           ${next.speciale==='Sì' ? `<span class="pill-soft" style="background:#facc15;color:#3a2f00;font-weight:800">🔥 DA NON PERDERE</span>` : ''}
         `;
 
+        // Via del campo, in piccolo sotto la data (per la Coppa è già nel pill in alto)
+        const viaCampo = isCoppa ? '' : (isHomeCorb && (!next.tipo || next.tipo==='Campionato') ? 'Palazzetto di Bosco Chiesanuova' : (next.indirizzo || viaCampoSquadra(homeName)));
+        document.getElementById('nextVenue').innerHTML = viaCampo ? `📍 ${viaCampo}` : '';
+
         document.getElementById('nextCard').classList.toggle('derby', next.speciale==='Sì');
         document.getElementById('addCalBtn').style.display = 'inline-flex';
         document.getElementById('addCalBtn').onclick = () => addToCalendar(next, homeName, awayName);
       } else {
         nextBlock.innerHTML = `<div class="small" style="grid-column:1/-1">Nessuna partita in programma</div>`;
         nextMeta.innerHTML = '';
+        document.getElementById('nextVenue').innerHTML = '';
         document.getElementById('addCalBtn').style.display = 'none';
       }
 

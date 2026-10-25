@@ -156,7 +156,7 @@
   </main>
 
   <script type="module">
-    import { subscribeMatches, subscribeNews, subscribeStandings, currentSeason } from './data-store.js';
+    import { subscribeMatches, subscribeNews, subscribeStandings, currentSeason, viaCampoSquadra } from './data-store.js';
 
     // Drawer
     const drawer = document.getElementById('drawer');
@@ -293,7 +293,7 @@
       const giornataTxt = tipo === 'Coppa' ? (nextMatch.fase || '') : (tipo === 'Campionato' && nextMatch.giornata ? `${nextMatch.giornata}ª giornata` : '');
       const indirizzo = tipo === 'Coppa' ? 'C.S. Avanzi - Via Flavio Gioia - Vr'
         : (tipo === 'Campionato' && homeName.toLowerCase()===CORB) ? 'Palazzetto di Bosco Chiesanuova'
-        : (nextMatch.indirizzo || '');
+        : (nextMatch.indirizzo || viaCampoSquadra(homeName));
       const giornoOraTxt = nextMatch.date.toLocaleDateString('it-IT', {day:'numeric', month:'short'}).replace('.','')
         + (nextMatch.ora ? ` - ${nextMatch.ora}` : '');
 
@@ -307,13 +307,13 @@
             ${giornataTxt ? `<span style="font-size:13px;font-weight:700;opacity:.9">${giornataTxt}</span>` : ''}
             <span style="font-size:13px;font-weight:700;opacity:.9">${tipo}</span>
             <span style="font-size:13px;font-weight:700;opacity:.9">${giornoOraTxt}</span>
+            ${indirizzo ? `<span style="font-size:10px;opacity:.75;text-align:center;max-width:150px;line-height:1.3">${indirizzo}</span>` : ''}
           </div>
           <div style="display:flex;flex-direction:column;align-items:center;gap:6px;width:80px">
             ${awayBadge}
             <span style="font-size:11px;text-align:center">${awayName}</span>
           </div>
-        </div>
-        ${indirizzo ? `<div style="font-size:12px;opacity:.8;margin-top:10px;text-align:center">${indirizzo}</div>` : ''}`;
+        </div>`;
     }
 
     // 👇 Si aggiorna DA SOLO ogni volta che qualcosa cambia nel database,
