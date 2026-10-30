@@ -325,7 +325,9 @@
         const isCorb = team.toLowerCase() === 'corbiolo';
         const who = `<div style="font-size:13px;font-weight:600;line-height:1.25;word-break:break-word">${txt}</div>`;
         const tm = `<div><span style="font-size:14px;font-weight:800">${time}</span> <span style="font-size:11px;color:var(--muted);margin-left:3px">${per}</span></div>`;
-        const left = team.toLowerCase() === H;
+        // Autogol: la riga porta il nome di chi l'ha fatto, ma il punto va all'altra squadra,
+        // quindi sta dalla parte opposta.
+        const left = (ico === '🥅') ? (team.toLowerCase() !== H) : (team.toLowerCase() === H);
         rows.push(`<div style="display:grid;${COLS};align-items:center">`
           + (left
               ? `<div style="padding:7px 4px 7px 0;text-align:right">${who}</div>${center(ico)}<div style="padding:7px 0 7px 4px">${tm}</div>`
