@@ -462,18 +462,28 @@
       setTimeout(()=>{ $('msgZone').innerHTML=''; }, 4000);
     }
 
-    async function moveVideo(rows, id, direction){
-      const idx = rows.findIndex(r => r.id === id);
-      const targetIdx = idx + direction;
-      if (targetIdx < 0 || targetIdx >= rows.length) return;
-      const a = rows[idx], b = rows[targetIdx];
-      // Se l'ordine non è ancora mai stato impostato, lo assegno ora in base
-      // alla posizione attuale, così i prossimi spostamenti funzionano sempre.
-      const ordA = a.ordine != null ? +a.ordine : idx;
-      const ordB = b.ordine != null ? +b.ordine : targetIdx;
+    // Ordine dei video dentro una categoria: prima quelli senza ordine manuale (i nuovi, dal più recente),
+    // poi quelli con ordine manuale, dal numero più basso. L'ordine manuale vale anche sulla pagina Video.
+    const videoTs = (v)=>{
+      const c = v.createdAt;
+      if (c && typeof c.toMillis === 'function') return c.toMillis();
+      if (c && c.seconds) return c.seconds*1000;
+      return c ? 0 : (v.createdAt === null ? Date.now() : 0); // appena aggiunto: ancora senza data = il più nuovo
+    };
+    const hasOrd = (v)=> v.ordine != null && v.ordine !== '';
+    const ordVideo = (a,b)=> (hasOrd(a) && hasOrd(b)) ? (+a.ordine - +b.ordine) : hasOrd(a) ? 1 : hasOrd(b) ? -1 : videoTs(b) - videoTs(a);
+
+    // Sposta un video su (-1) o giù (+1) DENTRO la sua categoria e salva l'ordine di tutta la categoria (0,1,2…)
+    async function moveVideo(groups, id, direction){
+      const key = Object.keys(groups).find(k => groups[k].some(r => r.id === id));
+      if (!key) return;
+      const lista = groups[key].slice();
+      const idx = lista.findIndex(r => r.id === id);
+      const t = idx + direction;
+      if (t < 0 || t >= lista.length) return;
+      [lista[idx], lista[t]] = [lista[t], lista[idx]];
       try{
-        await Videos.update(a.id, { ordine: ordB });
-        await Videos.update(b.id, { ordine: ordA });
+        await Promise.all(lista.map((r,i)=> (hasOrd(r) && +r.ordine === i) ? null : Videos.update(r.id, { ordine: i })));
       }catch(err){ showMsg('Errore: '+err.message, 'err'); }
     }
 
@@ -483,10 +493,13 @@
       const rows = [...(cache[currentTab]||[])];
       if (ent.sort) rows.sort(ent.sort);
 
-      const rowHtml = (r,i) => `
+      let videoGroups = {};
+      const rowHtml = (r,i,n) => `
         <div class="item-row">
           <div>${ent.itemLabel(r)}</div>
           <div class="item-actions">
+            ${currentTab==='videos' && typeof n === 'number' && i > 0 ? `<button data-act="up" data-id="${r.id}">⬆️ Su</button>` : ''}
+            ${currentTab==='videos' && typeof n === 'number' && i < n-1 ? `<button data-act="down" data-id="${r.id}">⬇️ Giù</button>` : ''}
             <button data-act="edit" data-id="${r.id}">✏️ Modifica</button>
             <button data-act="del" data-id="${r.id}">🗑️ Elimina</button>
             ${currentTab==='matches' ? `<button data-act="cronaca" data-id="${r.id}">📓 Cronaca</button>` : ''}
@@ -505,7 +518,23 @@
         });
         $('listZone').innerHTML = ordineGruppi.map(chiave=>{
           const isOpen = !!listOpenGroups[chiave];
-          const righeGruppo = gruppi[chiave].map((r)=> rowHtml(r, rows.indexOf(r))).join('');
+          const lista = gruppi[chiave];
+          let righeGruppo;
+          if ((lista[0].tipo||'Campionato') === 'Campionato'){
+            // Campionato: due sotto-categorie. Da giocare = senza risultato, dalla più vicina;
+            // Già giocate = con risultato, dall'ultima giocata in giù.
+            const daGiocare = lista.filter(r => !r.risultato).sort((a,b)=> (a.data||'').localeCompare(b.data||''));
+            const giocate   = lista.filter(r => !!r.risultato).sort((a,b)=> (b.data||'').localeCompare(a.data||''));
+            const sub = (k, titolo, arr)=>{
+              const aperta = (k in listOpenGroups) ? !!listOpenGroups[k] : true;
+              return `<button class="live-group-header" data-listsub="${k}" style="margin-top:6px;font-size:13px;padding-left:18px">
+                  <span>${titolo} (${arr.length})</span><span>${aperta?'▲':'▼'}</span>
+                </button>${aperta ? arr.map(r => rowHtml(r, rows.indexOf(r))).join('') : ''}`;
+            };
+            righeGruppo = sub(chiave+'|da', '🗓️ Da giocare', daGiocare) + sub(chiave+'|gia', '✅ Già giocate', giocate);
+          } else {
+            righeGruppo = lista.map((r)=> rowHtml(r, rows.indexOf(r))).join('');
+          }
           return `
             <div class="live-group">
               <button class="live-group-header" data-listgroup="${chiave}">
@@ -535,8 +564,10 @@
           const chiave = r.stagione || 'Senza categoria';
           (gruppi[chiave] = gruppi[chiave] || []).push(r);
         });
-        Object.values(gruppi).forEach(g => g.sort((a,b)=> ts(b) - ts(a)));
-        const chiavi = Object.keys(gruppi).sort((a,b)=> ts(gruppi[b][0]) - ts(gruppi[a][0]));
+        Object.values(gruppi).forEach(g => g.sort(ordVideo));
+        videoGroups = gruppi;
+        const gTs = (g)=> Math.max(...g.map(ts)); // gruppi: per il video più recente che contengono
+        const chiavi = Object.keys(gruppi).sort((a,b)=> gTs(gruppi[b]) - gTs(gruppi[a]));
         $('listZone').innerHTML = chiavi.map((chiave, idx)=>{
           const k = 'video:' + chiave;
           const isOpen = (k in listOpenGroups) ? !!listOpenGroups[k] : idx === 0; // il primo gruppo è aperto di default
@@ -545,7 +576,7 @@
               <button class="live-group-header" data-listgroup="${k}">
                 <span>${chiave} (${gruppi[chiave].length})</span><span>${isOpen?'▲':'▼'}</span>
               </button>
-              ${isOpen ? gruppi[chiave].map(r => rowHtml(r, 0)).join('') : ''}
+              ${isOpen ? gruppi[chiave].map((r,i,arr) => rowHtml(r, i, arr.length)).join('') : ''}
             </div>`;
         }).join('');
         $('listZone').querySelectorAll('[data-listgroup]').forEach(b=>{
@@ -560,11 +591,19 @@
         $('listZone').innerHTML = rows.length ? rows.map(rowHtml).join('') : '<div class="small">Nessun elemento ancora.</div>';
       }
 
+      $('listZone').querySelectorAll('[data-listsub]').forEach(b=>{
+        b.onclick = ()=>{
+          const k = b.dataset.listsub;
+          listOpenGroups[k] = (k in listOpenGroups) ? !listOpenGroups[k] : false; // di default aperte
+          renderList();
+        };
+      });
+
       $('listZone').querySelectorAll('[data-act="up"]').forEach(btn=>{
-        btn.onclick = ()=> moveVideo(rows, btn.dataset.id, -1);
+        btn.onclick = ()=> moveVideo(videoGroups, btn.dataset.id, -1);
       });
       $('listZone').querySelectorAll('[data-act="down"]').forEach(btn=>{
-        btn.onclick = ()=> moveVideo(rows, btn.dataset.id, 1);
+        btn.onclick = ()=> moveVideo(videoGroups, btn.dataset.id, 1);
       });
 
       $('listZone').querySelectorAll('[data-act="edit"]').forEach(btn=>{
