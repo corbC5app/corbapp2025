@@ -179,6 +179,16 @@
       return best;
     }
 
+    // Se la partita non c'è (es. stagione scorsa) provo a prendere il logo della squadra da un'altra sua partita
+    function logoDaNome(name){
+      if (!name || isCorb(name)) return '';
+      for (const m of matchesCache){
+        if (m.logo_casa  && sim(name, m.casa  || '') >= 0.8) return m.logo_casa;
+        if (m.logo_fuori && sim(name, m.fuori || '') >= 0.8) return m.logo_fuori;
+      }
+      return '';
+    }
+
     const badge = (name, url, size) => isCorb(name)
       ? `<img src="img/logo_c5.png" alt="" style="width:${size}px;height:${size}px;border-radius:22%;object-fit:contain;background:#fff;flex-shrink:0">`
       : (typeof window.teamBadgeHTML === 'function')
@@ -198,6 +208,7 @@
       else if (p.gc != null) score = `${p.gc}-${p.gf}`;
 
       let label = '–';
+      if (!m && /coppa/i.test(v.stagione||'')) label = 'Coppa';
       if (m){
         const t = m.tipo || 'Campionato';
         label = t === 'Coppa' ? (m.fase || 'Coppa')
@@ -206,7 +217,7 @@
       }
 
       const inner = `<div class="vsq-top">${label}</div>`
-        + `<div class="vsq-row">${badge(casa, m && m.logo_casa, 24)}<span class="vsq-score">${score}</span>${badge(fuori, m && m.logo_fuori, 24)}</div>`;
+        + `<div class="vsq-row">${badge(casa, (m && m.logo_casa) || logoDaNome(casa), 24)}<span class="vsq-score">${score}</span>${badge(fuori, (m && m.logo_fuori) || logoDaNome(fuori), 24)}</div>`;
       return v.link
         ? `<a class="vsq" href="${v.link}" target="_blank" rel="noopener">${inner}</a>`
         : `<div class="vsq">${inner}</div>`;
@@ -256,7 +267,10 @@
         (bySeason[s] = bySeason[s] || []).push(v);
       });
 
-      const seasons = Object.keys(bySeason).sort((a,b) => b.localeCompare(a)); // più recente prima
+      // Ordine: stagione più recente prima; dentro la stessa stagione Campionato, poi Coppa, poi Amichevoli, poi il resto.
+      const annoDi = (t)=> +((String(t).match(/(\d{4})\s*\/\s*\d{2,4}/)||[])[1] || 0);
+      const tipoDi = (t)=>{ t = String(t).toLowerCase(); return t.includes('campionato') ? 0 : t.includes('coppa') ? 1 : t.includes('amichevol') ? 2 : 3; };
+      const seasons = Object.keys(bySeason).sort((a,b) => (annoDi(b) - annoDi(a)) || (tipoDi(a) - tipoDi(b)) || a.localeCompare(b));
       if (!seasons.length){
         box.innerHTML = `<div class="small">Nessun video disponibile.</div>`;
         return;
