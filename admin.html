@@ -523,15 +523,20 @@
           if ((lista[0].tipo||'Campionato') === 'Campionato'){
             // Campionato: due sotto-categorie. Da giocare = senza risultato, dalla più vicina;
             // Già giocate = con risultato, dall'ultima giocata in giù.
-            const daGiocare = lista.filter(r => !r.risultato).sort((a,b)=> (a.data||'').localeCompare(b.data||''));
-            const giocate   = lista.filter(r => !!r.risultato).sort((a,b)=> (b.data||'').localeCompare(a.data||''));
-            const sub = (k, titolo, arr)=>{
-              const aperta = (k in listOpenGroups) ? !!listOpenGroups[k] : true;
-              return `<button class="live-group-header" data-listsub="${k}" style="margin-top:6px;font-size:13px;padding-left:18px">
+            // Solo le partite del Corbiolo; quelle tra altre squadre (dallo scraper) vanno in "Altre partite del girone", chiusa.
+            const eCorb = r => (r.casa||'Corbiolo').toLowerCase().includes('corbiolo') || (r.fuori||'').toLowerCase().includes('corbiolo');
+            const mie   = lista.filter(eCorb);
+            const altre = lista.filter(r => !eCorb(r)).sort((a,b)=> (b.data||'').localeCompare(a.data||''));
+            const daGiocare = mie.filter(r => !r.risultato).sort((a,b)=> (a.data||'').localeCompare(b.data||''));
+            const giocate   = mie.filter(r => !!r.risultato).sort((a,b)=> (b.data||'').localeCompare(a.data||''));
+            const sub = (k, titolo, arr, apertaDiDefault = true)=>{
+              const aperta = (k in listOpenGroups) ? !!listOpenGroups[k] : apertaDiDefault;
+              return `<button class="live-group-header" data-listsub="${k}" data-def="${apertaDiDefault ? 1 : 0}" style="margin-top:6px;font-size:13px;padding-left:18px">
                   <span>${titolo} (${arr.length})</span><span>${aperta?'▲':'▼'}</span>
                 </button>${aperta ? arr.map(r => rowHtml(r, rows.indexOf(r))).join('') : ''}`;
             };
-            righeGruppo = sub(chiave+'|da', '🗓️ Da giocare', daGiocare) + sub(chiave+'|gia', '✅ Già giocate', giocate);
+            righeGruppo = sub(chiave+'|da', '🗓️ Da giocare', daGiocare) + sub(chiave+'|gia', '✅ Già giocate', giocate)
+              + (altre.length ? sub(chiave+'|altre', '📋 Altre partite del girone', altre, false) : '');
           } else {
             righeGruppo = lista.map((r)=> rowHtml(r, rows.indexOf(r))).join('');
           }
@@ -594,7 +599,8 @@
       $('listZone').querySelectorAll('[data-listsub]').forEach(b=>{
         b.onclick = ()=>{
           const k = b.dataset.listsub;
-          listOpenGroups[k] = (k in listOpenGroups) ? !listOpenGroups[k] : false; // di default aperte
+          const def = b.dataset.def !== '0';
+          listOpenGroups[k] = !((k in listOpenGroups) ? listOpenGroups[k] : def);
           renderList();
         };
       });
