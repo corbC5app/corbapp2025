@@ -23,7 +23,18 @@
       padding:16px;font-weight:900;font-size:17px;color:var(--text);cursor:pointer;text-align:left
     }
     .season-header .chevron{font-size:13px;color:var(--muted);flex-shrink:0;margin-left:8px}
-    .season-content{display:grid;gap:12px;padding:0 12px 12px 12px}
+    .season-content{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:0 12px 12px 12px}
+    .season-content > .video-card{grid-column:1 / -1} /* video senza partita riconosciuta: a tutta larghezza come prima */
+
+    /* Quadrato partita: giornata sopra, sotto logo casa - risultato - logo fuori */
+    .vsq{
+      aspect-ratio:1/1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+      padding:6px 4px;border:1px solid var(--ring);border-radius:14px;background:var(--card);
+      color:var(--text);text-decoration:none;box-shadow:0 1px 5px rgba(0,0,0,.08);
+    }
+    .vsq-top{font-size:11px;font-weight:800;color:var(--muted);text-align:center;line-height:1.15}
+    .vsq-row{display:flex;align-items:center;justify-content:center;gap:3px;max-width:100%}
+    .vsq-score{font-size:14px;font-weight:900;white-space:nowrap}
     .video-card{overflow:hidden;max-width:100%}
     .video-card .title{font-weight:700;margin:8px 0 4px 0;overflow-wrap:break-word;word-break:break-word}
     .video-card a.small{overflow-wrap:break-word;word-break:break-word}
@@ -105,7 +116,7 @@
   <script defer src="./install-prompt.js?v=2"></script>
 
   <script type="module">
-    import { subscribeVideos, currentSeason } from './data-store.js';
+    import { subscribeVideos, subscribeMatches, currentSeason } from './data-store.js';
 
     const box = document.getElementById('videos');
     const openSeasons = {}; // ricordo quali sezioni sono aperte tra un aggiornamento e l'altro
@@ -118,6 +129,89 @@
       const m2 = u.match(/youtu\.be\/([^?&]+)/); if (m2) return m2[1];
       return '';
     };
+
+    // ==== QUADRATI ====
+    // Dal titolo "Casa/Fuori (x-y)" ricavo le due squadre, poi cerco la partita nel
+    // calendario (stessa stagione, stesso tipo, Corbiolo dallo stesso lato) per avere
+    // numero di giornata e loghi. Se non la trovo il quadrato si vede lo stesso.
+    let matchesCache = [];
+    let videosCache = [];
+
+    const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/[.'’]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+    const isCorb = s => norm(s).includes('corbiolo');
+    const bigrams = s => { const t=' '+s+' '; const a=[]; for(let i=0;i<t.length-1;i++) a.push(t.slice(i,i+2)); return a; };
+    function sim(a,b){
+      a = norm(a); b = norm(b);
+      if (!a || !b) return 0;
+      if (a === b) return 1;
+      const A = bigrams(a), B = bigrams(b), cnt = {};
+      A.forEach(x => cnt[x] = (cnt[x]||0) + 1);
+      let inter = 0;
+      B.forEach(x => { if (cnt[x] > 0){ cnt[x]--; inter++; } });
+      const dice = 2*inter / (A.length + B.length);
+      return (a.includes(b) || b.includes(a)) ? Math.max(dice, 0.8) : dice; // tollera typo e "Asd"/"A.S.D." in più
+    }
+
+    function parseTitolo(t){
+      const m = String(t||'').match(/^\s*(.+?)\s*\/\s*(.+?)\s*(?:\(\s*(\d+)\s*[-–]\s*(\d+)\s*\))?\s*$/);
+      if (!m) return null;
+      return { casa:m[1], fuori:m[2], gc: m[3]!=null ? +m[3] : null, gf: m[4]!=null ? +m[4] : null };
+    }
+
+    function trovaPartita(v, p){
+      const cat = (v.stagione||'').toLowerCase();
+      const y = (cat.match(/(\d{4})\s*\/\s*\d{2,4}/)||[])[1];
+      const tipo = cat.includes('coppa') ? 'Coppa' : cat.includes('amichevol') ? 'Amichevole' : cat.includes('campionato') ? 'Campionato' : null;
+      const casaIsCorb = isCorb(p.casa);
+      const opp = casaIsCorb ? p.fuori : p.casa;
+      let best = null, bestScore = 0;
+      matchesCache.forEach(m => {
+        if (y && !String(m.stagione||'').startsWith(y)) return;
+        if (tipo && (m.tipo||'Campionato') !== tipo) return;
+        const mCasaCorb = isCorb(m.casa || 'Corbiolo');
+        if (mCasaCorb !== casaIsCorb) return;
+        let sc = sim(opp, mCasaCorb ? (m.fuori||'') : (m.casa||''));
+        if (sc < 0.5) return;
+        if (p.gc != null && m.risultato && String(m.risultato).replace(/\s/g,'') === `${p.gc}-${p.gf}`) sc += 0.5; // andata/ritorno: scelgo quella col risultato giusto
+        if (sc > bestScore){ best = m; bestScore = sc; }
+      });
+      return best;
+    }
+
+    const badge = (name, url, size) => isCorb(name)
+      ? `<img src="img/logo_c5.png" alt="" style="width:${size}px;height:${size}px;border-radius:22%;object-fit:contain;background:#fff;flex-shrink:0">`
+      : (typeof window.teamBadgeHTML === 'function')
+        ? window.teamBadgeHTML(name, url, size)
+        : `<div style="width:${size}px;height:${size}px;border-radius:22%;background:#ccc;flex-shrink:0"></div>`;
+
+    function quadrato(v){
+      const p = parseTitolo(v.nome);
+      if (!p) return null; // titolo non nel formato "Casa/Fuori": resta la card di prima
+      const m = trovaPartita(v, p);
+      const casa  = m ? (m.casa  || 'Corbiolo')   : p.casa;
+      const fuori = m ? (m.fuori || 'Avversario') : p.fuori;
+
+      let score = '–';
+      const rm = m && m.risultato ? String(m.risultato).match(/(\d+)\s*[-–]\s*(\d+)/) : null;
+      if (rm) score = `${rm[1]}-${rm[2]}`;
+      else if (p.gc != null) score = `${p.gc}-${p.gf}`;
+
+      let label = '–';
+      if (m){
+        const t = m.tipo || 'Campionato';
+        label = t === 'Coppa' ? (m.fase || 'Coppa')
+              : t === 'Amichevole' ? 'Amichevole'
+              : (m.giornata ? `${m.giornata}ª giornata` : '–');
+      }
+
+      const inner = `<div class="vsq-top">${label}</div>`
+        + `<div class="vsq-row">${badge(casa, m && m.logo_casa, 24)}<span class="vsq-score">${score}</span>${badge(fuori, m && m.logo_fuori, 24)}</div>`;
+      return v.link
+        ? `<a class="vsq" href="${v.link}" target="_blank" rel="noopener">${inner}</a>`
+        : `<div class="vsq">${inner}</div>`;
+    }
+    // ==== FINE QUADRATI ====
 
     function card(v){
       const titolo = v.nome || 'Video';
@@ -154,8 +248,8 @@
       }
     }
 
-    function renderVideos(list){
-      const rows = list || [];
+    function renderVideos(){
+      const rows = videosCache || [];
       const bySeason = {};
       rows.forEach(v => {
         const s = v.stagione || currentSeason();
@@ -186,7 +280,7 @@
               <span class="chevron">${isOpen ? '▲' : '▼'}</span>
             </button>
             <div class="season-content" style="display:${isOpen ? 'grid' : 'none'}">
-              ${videos.map(card).join('')}
+              ${videos.map(v => quadrato(v) || card(v)).join('')}
             </div>
           </div>`;
       }).join('');
@@ -195,13 +289,14 @@
         btn.addEventListener('click', () => {
           const s = btn.dataset.season;
           openSeasons[s] = !openSeasons[s];
-          renderVideos(rows);
+          renderVideos();
         });
       });
     }
 
     // 👇 si aggiorna da solo appena l'admin aggiunge/modifica un video
-    subscribeVideos(renderVideos);
+    subscribeVideos(list => { videosCache = list || []; renderVideos(); });
+    subscribeMatches(list => { matchesCache = list || []; renderVideos(); }); // quando arrivano le partite aggiorno giornate e loghi
 
     localStorage.setItem('corb-seen-video', String(Date.now()));
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
