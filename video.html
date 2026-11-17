@@ -35,6 +35,11 @@
     .vsq-top{font-size:11px;font-weight:800;color:var(--muted);text-align:center;line-height:1.15}
     .vsq-row{display:flex;align-items:center;justify-content:center;gap:3px;max-width:100%}
     .vsq-score{font-size:14px;font-weight:900;white-space:nowrap}
+    .vsq-logo{display:inline-flex;flex-shrink:0}
+    .vsq-name{
+      flex:0 1 38px;min-width:0;font-size:8.5px;font-weight:800;line-height:1.1;text-align:center;
+      display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word
+    }
     .video-card{overflow:hidden;max-width:100%}
     .video-card .title{font-weight:700;margin:8px 0 4px 0;overflow-wrap:break-word;word-break:break-word}
     .video-card a.small{overflow-wrap:break-word;word-break:break-word}
@@ -189,11 +194,25 @@
       return '';
     }
 
-    const badge = (name, url, size) => isCorb(name)
-      ? `<img src="img/logo_c5.png" alt="" style="width:${size}px;height:${size}px;border-radius:22%;object-fit:contain;background:#fff;flex-shrink:0">`
-      : (typeof window.teamBadgeHTML === 'function')
-        ? window.teamBadgeHTML(name, url, size)
-        : `<div style="width:${size}px;height:${size}px;border-radius:22%;background:#ccc;flex-shrink:0"></div>`;
+    const nameChip = (name) => `<span class="vsq-name">${name}</span>`;
+    // Logo se c'è; se la squadra non ha logo (o l'immagine non si carica) al suo posto il nome.
+    const badge = (name, url, size) => {
+      if (isCorb(name)) return `<img src="img/logo_c5.png" alt="" style="width:${size}px;height:${size}px;border-radius:22%;object-fit:contain;background:#fff;flex-shrink:0">`;
+      const html = (typeof window.teamBadgeHTML === 'function') ? window.teamBadgeHTML(name, url, size) : '';
+      return /<img/i.test(html)
+        ? `<span class="vsq-logo" data-name="${String(name).replace(/"/g,'&quot;')}">${html}</span>`
+        : nameChip(name);
+    };
+    // Immagine che non si carica → nome al suo posto
+    function nomiSeLogoRotto(){
+      box.querySelectorAll('.vsq-logo').forEach(w => {
+        const img = w.querySelector('img');
+        if (!img) return;
+        const sostituisci = () => { w.outerHTML = nameChip(w.dataset.name); };
+        if (img.complete && img.naturalWidth === 0) sostituisci();
+        else img.addEventListener('error', sostituisci, { once:true });
+      });
+    }
 
     function quadrato(v){
       const p = parseTitolo(v.nome);
@@ -285,7 +304,9 @@
 
       box.innerHTML = seasons.map(s => {
         const tsV = (x)=>{ const c=x.createdAt; return c && typeof c.toMillis==='function' ? c.toMillis() : (c && c.seconds ? c.seconds*1000 : 0); };
-        const videos = bySeason[s].slice().sort((a,b) => tsV(b) - tsV(a)); // più recente prima
+        // Ordine: i nuovi (senza ordine manuale) in alto dal più recente, poi quelli messi a mano dall'admin (Su/Giù)
+        const hasOrd = (x)=> x.ordine != null && x.ordine !== '';
+        const videos = bySeason[s].slice().sort((a,b) => (hasOrd(a) && hasOrd(b)) ? (+a.ordine - +b.ordine) : hasOrd(a) ? 1 : hasOrd(b) ? -1 : tsV(b) - tsV(a));
         const isOpen = !!openSeasons[s];
         return `
           <div class="season-block">
@@ -298,6 +319,8 @@
             </div>
           </div>`;
       }).join('');
+
+      nomiSeLogoRotto();
 
       box.querySelectorAll('.season-header').forEach(btn => {
         btn.addEventListener('click', () => {
