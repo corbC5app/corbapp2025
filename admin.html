@@ -448,13 +448,13 @@
             showMsg('Aggiunto.', 'ok');
           }
           editingId = null;
-          renderForm();
+          renderFormIdle();
         }catch(err){
           showMsg('Errore: ' + err.message, 'err');
         }
       };
       const cancelBtn = $('cancelEditBtn');
-      if (cancelBtn) cancelBtn.onclick = ()=>{ editingId = null; renderForm(); };
+      if (cancelBtn) cancelBtn.onclick = ()=>{ editingId = null; renderFormIdle(); };
     }
 
     function showMsg(text, cls){
@@ -675,8 +675,9 @@
       } else if (isSettings){
         renderSettingsTab();
       } else {
-        renderForm();
+        renderFormIdle();
         ensureSubscribed(tab);
+        if (tab === 'standings'){ ensureSubscribed('matches'); ensureSubscribed('players'); } // servono ai due controlli
         renderList();
       }
     }
@@ -709,6 +710,178 @@
           reg.active?.postMessage({ type: 'local-test-notify', title: e.title, body: e.body });
         };
       });
+    }
+
+    // ===================== TAB CLASSIFICA: i due pulsanti di controllo =====================
+    // Nella tab Classifica non c'è più il modulo di inserimento: due pulsanti fanno il lavoro.
+    // (Per correggere a mano una singola riga resta ✏️ Modifica nell'elenco.)
+    function renderFormIdle(){
+      if (currentTab === 'standings') renderStandingsTools(); else renderForm();
+    }
+
+    const escS = (t)=> String(t ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+    const eCorbiolo = (t)=> (t||'').toLowerCase().includes('corbiolo');
+    const risValido = (r)=> /^\s*\d+\s*[-–]\s*\d+\s*$/.test(r || '');
+
+    function renderStandingsTools(){
+      const st = currentSeason();
+      $('formZone').innerHTML = `
+        <div class="card" style="padding:12px">
+          <h3 style="margin:0 0 4px 0">🏅 Classifica ${escS(st)}</h3>
+          <div class="small" style="opacity:.8;margin-bottom:10px">Controllano le partite di Campionato e Coppa e sistemano da soli i numeri.</div>
+          <div class="row" style="gap:8px;flex-wrap:wrap">
+            <button id="stdUpdBtn" class="btn btn-primary" style="flex:1;justify-content:center">🔄 Aggiorna classifica</button>
+            <button id="stdScoBtn" class="btn btn-primary" style="flex:1;justify-content:center">⚽ Aggiorna marcatori</button>
+          </div>
+          <div id="stdOut" style="margin-top:12px;font-size:13px"></div>
+        </div>`;
+      $('stdUpdBtn').onclick = aggiornaClassifica;
+      $('stdScoBtn').onclick = aggiornaMarcatori;
+    }
+
+    const stdBusy = (on)=> ['stdUpdBtn','stdScoBtn'].forEach(id => { const b = $(id); if (b) b.disabled = on; });
+
+    // 1) AGGIORNA CLASSIFICA: ricalcola la classifica del Campionato dalle partite e corregge le righe che non tornano
+    async function aggiornaClassifica(){
+      const out = $('stdOut'); const st = currentSeason();
+      stdBusy(true); out.innerHTML = '⏳ Controllo in corso…';
+      try{
+        const tutte = (cache.matches || []).filter(m => (m.stagione||'') === st);
+        const campionato = tutte.filter(m => (m.tipo||'Campionato') === 'Campionato');
+        const calcolata = calcolaClassifica(campionato, {});
+        const righe = (cache.standings || []).filter(r => (r.stagione||'') === st);
+        const chiave = (t)=> (t||'').trim().toLowerCase();
+        const camp = ['punti','giocate','vinte','pareggiate','perse','gf','gs'];
+        const nomi = { punti:'Pt', giocate:'PG', vinte:'V', pareggiate:'N', perse:'P', gf:'GF', gs:'GS' };
+
+        const corretti = [];
+        for (const r of calcolata){
+          const ex = righe.find(x => chiave(x.squadra) === chiave(r.squadra));
+          if (!ex){
+            await Standings.add({ ...r, stagione: st, zona: 'Nessuna' });
+            corretti.push(`➕ <b>${escS(r.squadra)}</b>: riga mancante, creata`);
+            continue;
+          }
+          const diff = camp.filter(k => (+ex[k] || 0) !== r[k]);
+          if (diff.length){
+            await Standings.update(ex.id, { ...r, stagione: st }); // la zona resta com'è
+            corretti.push(`🔧 <b>${escS(r.squadra)}</b>: ` + diff.map(k => `${nomi[k]} ${+ex[k]||0} → ${r[k]}`).join(', '));
+          }
+        }
+
+        // Cose che NON correggo da solo ma ti segnalo
+        const oggi = new Date(); const oggiStr = `${oggi.getFullYear()}-${String(oggi.getMonth()+1).padStart(2,'0')}-${String(oggi.getDate()).padStart(2,'0')}`;
+        const nome = (m)=> `${escS(m.casa||'Corbiolo')} – ${escS(m.fuori||'Avversario')}${m.giornata ? ' ('+m.giornata+'ª)' : ''}${(m.tipo==='Coppa') ? ' [Coppa]' : ''}`;
+        const note = [];
+        tutte.forEach(m => {
+          const r = (m.risultato||'').trim();
+          if (r && !risValido(r)) note.push(`❓ ${nome(m)}: risultato non valido «${escS(r)}» (formato giusto: 3-2)`);
+          if (!r && m.data && m.data < oggiStr && (m.stato||'Regolare') === 'Regolare') note.push(`⏳ ${nome(m)}: data passata (${escS(m.data)}) ma senza risultato`);
+          if (r && risValido(r) && m.data && m.data > oggiStr) note.push(`📅 ${nome(m)}: ha un risultato ma la data è futura (${escS(m.data)})`);
+        });
+        const inCal = new Set(calcolata.map(r => chiave(r.squadra)));
+        const viste = {};
+        righe.forEach(x => {
+          const k = chiave(x.squadra);
+          if (!inCal.has(k)) note.push(`🗑️ In classifica c'è «${escS(x.squadra)}» ma non ha partite di Campionato ${escS(st)}`);
+          viste[k] = (viste[k]||0) + 1;
+        });
+        Object.keys(viste).filter(k => viste[k] > 1).forEach(k => note.push(`👯 «${escS(k)}» compare ${viste[k]} volte in classifica (duplicato da eliminare con 🗑️ nell'elenco)`));
+
+        const giocate = campionato.filter(m => risValido(m.risultato)).length;
+        out.innerHTML = `
+          <div style="font-weight:800;margin-bottom:6px">${corretti.length ? `🔧 Corrette ${corretti.length} righe` : '✅ La classifica era già corretta'}
+            <span style="font-weight:600;opacity:.75">(${calcolata.length} squadre, ${giocate} partite giocate)</span></div>
+          ${corretti.length ? `<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">${corretti.map(c=>`<div>${c}</div>`).join('')}</div>` : ''}
+          ${note.length ? `<div style="font-weight:800;margin:8px 0 4px 0">⚠️ Da controllare a mano (${note.length})</div>
+            <div style="display:flex;flex-direction:column;gap:4px">${note.map(c=>`<div>${c}</div>`).join('')}</div>` : ''}`;
+      }catch(err){
+        out.innerHTML = '❌ Errore: ' + escS(err.message);
+      }finally{ stdBusy(false); }
+    }
+
+    // 2) AGGIORNA MARCATORI: rilegge la cronaca delle partite di Campionato e Coppa e ricalcola i gol di ogni giocatore
+    async function aggiornaMarcatori(){
+      const out = $('stdOut'); const st = currentSeason();
+      stdBusy(true); out.innerHTML = '⏳ Controllo in corso…';
+      try{
+        const giocatori = cache.players || [];
+        const partite = (cache.matches || []).filter(m => (m.stagione||'') === st
+          && ['Campionato','Coppa'].includes(m.tipo||'Campionato')
+          && (eCorbiolo(m.casa || 'Corbiolo') || eCorbiolo(m.fuori)));
+        const conteggio = {};        // id giocatore -> gol
+        let autogolFavore = 0, golSenzaAutore = 0, golRisultati = 0;
+        const nonTrovati = [], incomplete = [];
+        const nome = (m)=> `${escS(m.casa||'Corbiolo')} – ${escS(m.fuori||'Avversario')}${m.giornata ? ' ('+m.giornata+'ª)' : ''}${(m.tipo==='Coppa') ? ' [Coppa]' : ''}`;
+
+        partite.forEach(m => {
+          let golEventi = 0;
+          (Array.isArray(m.eventi) ? m.eventi : []).forEach(e => {
+            const riga = String(e);
+            const i = riga.lastIndexOf(' — ');
+            if (i < 0) return;
+            const squadra = riga.slice(i + 3).trim();
+            const corb = eCorbiolo(squadra);
+            if (riga.includes('🥅')){ if (!corb){ autogolFavore++; golEventi++; } return; } // autogol avversario: gol di squadra, non di un giocatore
+            if (!riga.includes('⚽') || !corb) return;
+            golEventi++;
+            const num = (riga.slice(0, i).match(/\(#(\d+)\)/) || riga.slice(0, i).match(/Numero\s+(\d+)/) || [])[1];
+            const p = num ? giocatori.find(g => String(g.numero||'').trim() === num) : null;
+            if (p) conteggio[p.id] = (conteggio[p.id] || 0) + 1;
+            else { golSenzaAutore++; nonTrovati.push(`${nome(m)}: gol col numero ${num ? '#'+num : '?'} che non è in rosa`); }
+          });
+          const mm = String(m.risultato||'').match(/(\d+)\s*[-–]\s*(\d+)/);
+          if (mm){
+            const casaCorb = eCorbiolo(m.casa || 'Corbiolo');
+            const gCorb = +(casaCorb ? mm[1] : mm[2]);
+            golRisultati += gCorb;
+            if (gCorb !== golEventi) incomplete.push(`${nome(m)}: risultato ${gCorb} gol, cronaca ne ha ${golEventi}`);
+          }
+        });
+
+        const cambi = [];
+        giocatori.forEach(p => {
+          const nuovo = conteggio[p.id] || 0, vecchio = +p.gol || 0;
+          if (nuovo !== vecchio) cambi.push({ p, nuovo, vecchio });
+        });
+        cambi.sort((a,b)=> (b.nuovo - b.vecchio) - (a.nuovo - a.vecchio));
+        const attribuiti = Object.values(conteggio).reduce((s,n)=> s+n, 0);
+        const nonSpiegati = golRisultati - attribuiti - autogolFavore - golSenzaAutore;
+        const diminuzioni = cambi.filter(c => c.nuovo < c.vecchio).length;
+
+        const riepilogo = `
+          <div style="opacity:.85;margin-bottom:8px">
+            Gol del Corbiolo nei risultati: <b>${golRisultati}</b> · attribuiti ai marcatori: <b>${attribuiti}</b>
+            · autogol a favore: <b>${autogolFavore}</b>${golSenzaAutore ? ` · senza autore riconosciuto: <b>${golSenzaAutore}</b>` : ''}
+            ${nonSpiegati > 0 ? `<br>⚠️ <b>${nonSpiegati}</b> gol dei risultati non hanno la cronaca: non so chi li ha segnati.` : ''}
+          </div>`;
+        const noteHtml = (nonTrovati.length || incomplete.length) ? `
+          <div style="font-weight:800;margin:8px 0 4px 0">⚠️ Da controllare a mano (${nonTrovati.length + incomplete.length})</div>
+          <div style="display:flex;flex-direction:column;gap:4px">${[...nonTrovati.map(x=>'❓ '+x), ...incomplete.map(x=>'📓 '+x)].map(c=>`<div>${c}</div>`).join('')}</div>` : '';
+
+        if (!cambi.length){
+          out.innerHTML = `<div style="font-weight:800;margin-bottom:6px">✅ I marcatori sono già corretti (${partite.length} partite controllate)</div>${riepilogo}${noteHtml}`;
+          return;
+        }
+        out.innerHTML = `
+          <div style="font-weight:800;margin-bottom:6px">⚽ ${cambi.length} ${cambi.length===1?'giocatore da aggiornare':'giocatori da aggiornare'} (${partite.length} partite controllate)</div>
+          ${riepilogo}
+          <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">
+            ${cambi.map(c => `<div>${c.nuovo < c.vecchio ? '⚠️' : '🔧'} <b>${escS(c.p.nome||'?')}</b> (#${escS(c.p.numero||'-')}): ${c.vecchio} → ${c.nuovo}</div>`).join('')}
+          </div>
+          ${diminuzioni ? `<div style="margin-bottom:8px">⚠️ Dove il numero scende, di solito la cronaca di quelle partite è incompleta: se hai scritto i gol a mano, applicando li perderesti.</div>` : ''}
+          <button id="stdApplyBtn" class="btn btn-primary" style="width:100%;justify-content:center">✅ Applica ${cambi.length} ${cambi.length===1?'modifica':'modifiche'}</button>
+          ${noteHtml}`;
+        $('stdApplyBtn').onclick = async ()=>{
+          const b = $('stdApplyBtn'); b.disabled = true; b.textContent = 'Salvataggio…';
+          try{
+            for (const c of cambi) await Players.update(c.p.id, { gol: c.nuovo });
+            out.innerHTML = `<div style="font-weight:800">✅ Marcatori aggiornati (${cambi.length})</div>${riepilogo}${noteHtml}`;
+          }catch(err){ out.innerHTML = '❌ Errore: ' + escS(err.message); }
+        };
+      }catch(err){
+        out.innerHTML = '❌ Errore: ' + escS(err.message);
+      }finally{ stdBusy(false); }
     }
 
     // ===================== TAB GIRONE (risultati altre squadre → classifica calcolata da sola) =====================
