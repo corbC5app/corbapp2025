@@ -800,7 +800,9 @@
       }finally{ stdBusy(false); }
     }
 
-    // 2) AGGIORNA MARCATORI: rilegge la cronaca delle partite di Campionato e Coppa e ricalcola i gol di ogni giocatore
+    // 2) AGGIORNA MARCATORI: rilegge la cronaca delle partite di Campionato e Coppa e ricalcola i gol di ogni giocatore.
+    // Non salva da solo: per ogni giocatore che cambia puoi aprire il dettaglio (da quali partite/minuti vengono i gol
+    // in cronaca), scegliere con la spunta quali modifiche applicare e poi premere Applica.
     async function aggiornaMarcatori(){
       const out = $('stdOut'); const st = currentSeason();
       stdBusy(true); out.innerHTML = '⏳ Controllo in corso…';
@@ -810,9 +812,16 @@
           && ['Campionato','Coppa'].includes(m.tipo||'Campionato')
           && (eCorbiolo(m.casa || 'Corbiolo') || eCorbiolo(m.fuori)));
         const conteggio = {};        // id giocatore -> gol
+        const dettagli  = {};        // id giocatore -> [{ m, per, min, score, nomeEv, sospetto }]
         let autogolFavore = 0, golSenzaAutore = 0, golRisultati = 0;
         const nonTrovati = [], incomplete = [];
         const nome = (m)=> `${escS(m.casa||'Corbiolo')} – ${escS(m.fuori||'Avversario')}${m.giornata ? ' ('+m.giornata+'ª)' : ''}${(m.tipo==='Coppa') ? ' [Coppa]' : ''}`;
+        const low = (t)=> (t||'').toString().trim().toLowerCase();
+
+        // Numeri di maglia doppi in rosa: renderebbero ambigua l'attribuzione
+        const perNumero = {};
+        giocatori.forEach(g => { const n = String(g.numero||'').trim(); if (n) (perNumero[n] = perNumero[n] || []).push(g.nome||'?'); });
+        const numeriDoppi = Object.entries(perNumero).filter(([,v]) => v.length > 1);
 
         partite.forEach(m => {
           let golEventi = 0;
@@ -825,10 +834,17 @@
             if (riga.includes('🥅')){ if (!corb){ autogolFavore++; golEventi++; } return; } // autogol avversario: gol di squadra, non di un giocatore
             if (!riga.includes('⚽') || !corb) return;
             golEventi++;
-            const num = (riga.slice(0, i).match(/\(#(\d+)\)/) || riga.slice(0, i).match(/Numero\s+(\d+)/) || [])[1];
+            const testa = riga.slice(0, i);
+            const num = (testa.match(/\(#(\d+)\)/) || testa.match(/Numero\s+(\d+)/) || [])[1];
             const p = num ? giocatori.find(g => String(g.numero||'').trim() === num) : null;
-            if (p) conteggio[p.id] = (conteggio[p.id] || 0) + 1;
-            else { golSenzaAutore++; nonTrovati.push(`${nome(m)}: gol col numero ${num ? '#'+num : '?'} che non è in rosa`); }
+            if (!p){ golSenzaAutore++; nonTrovati.push(`${nome(m)}: gol col numero ${num ? '#'+num : '?'} che non è in rosa`); return; }
+            conteggio[p.id] = (conteggio[p.id] || 0) + 1;
+            const tm = testa.match(/^(\S+)\s+(\d+)['’]/);
+            const sc = testa.match(/⚽\s*(\d+\s*[-–]\s*\d+)/);
+            const nomeEv = low(testa.replace(/^.*?⚽\s*(?:\d+\s*[-–]\s*\d+\s+)?/, '').replace(/\s*\(#\d+\)\s*$/, ''));
+            const nomiRosa = [p.soprannome, p.nome].map(low).filter(Boolean);
+            const sospetto = !!nomeEv && !/^numero/.test(nomeEv) && !nomiRosa.some(x => x.includes(nomeEv) || nomeEv.includes(x));
+            (dettagli[p.id] = dettagli[p.id] || []).push({ m, per: tm ? tm[1] : '', min: tm ? tm[2] : '', score: sc ? sc[1].replace(/\s/g,'') : '', nomeEv, sospetto });
           });
           const mm = String(m.risultato||'').match(/(\d+)\s*[-–]\s*(\d+)/);
           if (mm){
@@ -847,14 +863,16 @@
         cambi.sort((a,b)=> (b.nuovo - b.vecchio) - (a.nuovo - a.vecchio));
         const attribuiti = Object.values(conteggio).reduce((s,n)=> s+n, 0);
         const nonSpiegati = golRisultati - attribuiti - autogolFavore - golSenzaAutore;
-        const diminuzioni = cambi.filter(c => c.nuovo < c.vecchio).length;
+        const saldo = cambi.reduce((s,c)=> s + (c.nuovo - c.vecchio), 0);
 
         const riepilogo = `
           <div style="opacity:.85;margin-bottom:8px">
             Gol del Corbiolo nei risultati: <b>${golRisultati}</b> · attribuiti ai marcatori: <b>${attribuiti}</b>
             · autogol a favore: <b>${autogolFavore}</b>${golSenzaAutore ? ` · senza autore riconosciuto: <b>${golSenzaAutore}</b>` : ''}
             ${nonSpiegati > 0 ? `<br>⚠️ <b>${nonSpiegati}</b> gol dei risultati non hanno la cronaca: non so chi li ha segnati.` : ''}
-          </div>`;
+            ${(nonSpiegati === 0 && cambi.length && saldo === 0) ? `<br>ℹ️ Il totale quadra: i gol ci sono tutti in cronaca. Cambia solo <b>a chi</b> sono attribuiti (una maglia sbagliata o una cronaca corretta dopo).` : ''}
+          </div>
+          ${numeriDoppi.length ? `<div style="margin-bottom:8px">⚠️ In rosa c'è lo stesso numero a più giocatori: ${numeriDoppi.map(([n,v]) => `#${escS(n)} (${v.map(escS).join(', ')})`).join('; ')}. Così i gol possono finire alla persona sbagliata.</div>` : ''}`;
         const noteHtml = (nonTrovati.length || incomplete.length) ? `
           <div style="font-weight:800;margin:8px 0 4px 0">⚠️ Da controllare a mano (${nonTrovati.length + incomplete.length})</div>
           <div style="display:flex;flex-direction:column;gap:4px">${[...nonTrovati.map(x=>'❓ '+x), ...incomplete.map(x=>'📓 '+x)].map(c=>`<div>${c}</div>`).join('')}</div>` : '';
@@ -863,20 +881,67 @@
           out.innerHTML = `<div style="font-weight:800;margin-bottom:6px">✅ I marcatori sono già corretti (${partite.length} partite controllate)</div>${riepilogo}${noteHtml}`;
           return;
         }
+
+        // Dettaglio di un giocatore: i suoi gol in cronaca, partita per partita
+        const dettaglioHtml = (c)=>{
+          const lista = dettagli[c.p.id] || [];
+          const perPartita = new Map();
+          lista.forEach(d => { const k = d.m.id; if (!perPartita.has(k)) perPartita.set(k, { m: d.m, gol: [] }); perPartita.get(k).gol.push(d); });
+          const ordine = [...perPartita.values()].sort((x,y)=> (x.m.data||'').localeCompare(y.m.data||'') || (+x.m.giornata||0) - (+y.m.giornata||0));
+          const righe = ordine.map(({m, gol}) => `
+            <div style="margin-top:6px">
+              <div style="font-weight:700">${nome(m)}${m.risultato ? ` · ${escS(m.risultato)}` : ''}${m.data ? ` <span style="opacity:.6;font-weight:500">${escS(m.data)}</span>` : ''}</div>
+              <div style="opacity:.9">${gol.length} ${gol.length===1?'gol':'gol'}: ${gol.map(d => `${d.min ? escS(d.per+' '+d.min+"'") : '—'}${d.score ? ' ('+escS(d.score)+')' : ''}${d.sospetto ? ` ❗<span style="opacity:.85">in cronaca c'è scritto «${escS(d.nomeEv)}»</span>` : ''}`).join(' · ')}</div>
+            </div>`).join('');
+          return `
+            <div style="margin-bottom:4px">Salvato in rosa: <b>${c.vecchio}</b> · dalla cronaca: <b>${c.nuovo}</b></div>
+            ${righe || `<div style="opacity:.85">Nessun gol in cronaca col numero #${escS(c.p.numero||'-')}.</div>`}
+            <div style="margin-top:8px;opacity:.75">${c.nuovo < c.vecchio
+              ? 'La rosa ne ha di più della cronaca: o un gol è stato registrato con un altro numero, o la cronaca è stata corretta dopo, o il totale è stato scritto a mano.'
+              : 'La cronaca ne ha di più della rosa: probabilmente la cronaca è stata modificata dopo (✕ o modifica) senza aggiornare il totale.'}</div>`;
+        };
+
         out.innerHTML = `
-          <div style="font-weight:800;margin-bottom:6px">⚽ ${cambi.length} ${cambi.length===1?'giocatore da aggiornare':'giocatori da aggiornare'} (${partite.length} partite controllate)</div>
+          <div style="font-weight:800;margin-bottom:6px">⚽ ${cambi.length} ${cambi.length===1?'giocatore da controllare':'giocatori da controllare'} (${partite.length} partite controllate)</div>
           ${riepilogo}
-          <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">
-            ${cambi.map(c => `<div>${c.nuovo < c.vecchio ? '⚠️' : '🔧'} <b>${escS(c.p.nome||'?')}</b> (#${escS(c.p.numero||'-')}): ${c.vecchio} → ${c.nuovo}</div>`).join('')}
+          <div class="small" style="opacity:.75;margin-bottom:6px">Tocca un nome per vedere da quali partite vengono i gol. Togli la spunta a chi non vuoi cambiare.</div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">
+            ${cambi.map((c,k) => `
+              <div style="border:1px solid var(--ring);border-radius:12px;padding:8px 10px">
+                <div style="display:flex;align-items:center;gap:10px">
+                  <input type="checkbox" data-chk="${k}" checked style="width:20px;height:20px;flex-shrink:0">
+                  <div data-tog="${k}" style="flex:1;cursor:pointer;display:flex;justify-content:space-between;gap:8px;align-items:center">
+                    <span>${c.nuovo < c.vecchio ? '⚠️' : '🔧'} <b>${escS(c.p.nome||'?')}</b> (#${escS(c.p.numero||'-')}): ${c.vecchio} → ${c.nuovo}</span>
+                    <span data-arrow="${k}" style="opacity:.6">▼</span>
+                  </div>
+                </div>
+                <div id="stdDet_${k}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed var(--ring);font-size:12px">${dettaglioHtml(c)}</div>
+              </div>`).join('')}
           </div>
-          ${diminuzioni ? `<div style="margin-bottom:8px">⚠️ Dove il numero scende, di solito la cronaca di quelle partite è incompleta: se hai scritto i gol a mano, applicando li perderesti.</div>` : ''}
-          <button id="stdApplyBtn" class="btn btn-primary" style="width:100%;justify-content:center">✅ Applica ${cambi.length} ${cambi.length===1?'modifica':'modifiche'}</button>
+          <button id="stdApplyBtn" class="btn btn-primary" style="width:100%;justify-content:center"></button>
           ${noteHtml}`;
-        $('stdApplyBtn').onclick = async ()=>{
-          const b = $('stdApplyBtn'); b.disabled = true; b.textContent = 'Salvataggio…';
+
+        const apply = $('stdApplyBtn');
+        const selezionati = ()=> cambi.filter((c,k) => { const cb = out.querySelector(`[data-chk="${k}"]`); return cb && cb.checked; });
+        const aggiornaBottone = ()=>{
+          const n = selezionati().length;
+          apply.disabled = n === 0;
+          apply.textContent = n === 0 ? 'Nessuna modifica selezionata' : `✅ Applica ${n} ${n===1?'modifica':'modifiche'}`;
+        };
+        out.querySelectorAll('[data-chk]').forEach(cb => cb.onchange = aggiornaBottone);
+        out.querySelectorAll('[data-tog]').forEach(el => el.onclick = ()=>{
+          const k = el.dataset.tog, box = $('stdDet_' + k) || out.querySelector('#stdDet_' + k);
+          const aperto = box.style.display !== 'none';
+          box.style.display = aperto ? 'none' : 'block';
+          out.querySelector(`[data-arrow="${k}"]`).textContent = aperto ? '▼' : '▲';
+        });
+        aggiornaBottone();
+        apply.onclick = async ()=>{
+          const scelti = selezionati();
+          apply.disabled = true; apply.textContent = 'Salvataggio…';
           try{
-            for (const c of cambi) await Players.update(c.p.id, { gol: c.nuovo });
-            out.innerHTML = `<div style="font-weight:800">✅ Marcatori aggiornati (${cambi.length})</div>${riepilogo}${noteHtml}`;
+            for (const c of scelti) await Players.update(c.p.id, { gol: c.nuovo });
+            out.innerHTML = `<div style="font-weight:800">✅ Aggiornati ${scelti.length} ${scelti.length===1?'giocatore':'giocatori'}${scelti.length < cambi.length ? ` (${cambi.length - scelti.length} lasciati com'erano)` : ''}</div>${riepilogo}${noteHtml}`;
           }catch(err){ out.innerHTML = '❌ Errore: ' + escS(err.message); }
         };
       }catch(err){
